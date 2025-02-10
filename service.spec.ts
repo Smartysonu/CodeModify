@@ -3,6 +3,7 @@ import { ResponseService } from '@app_services';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { ConfigService } from '@app_services';
 import { SocketService } from '@app_services';
+import { HttpClient } from '@angular/common/http';
 
 describe('ResponseService - uploadFile', () => {
   let service: ResponseService;
@@ -30,13 +31,18 @@ describe('ResponseService - uploadFile', () => {
   });
 
   afterEach(() => {
-    httpMock.verify();
+    httpMock.verify(); // Ensure no unmatched requests are left
   });
 
   it('should send a POST request with correct FormData', () => {
     const mockFile = new File(['dummy content'], 'test.txt', { type: 'text/plain' });
     const mockEnvConfig = { baseUrl: 'http://localhost:3000' };
-    configService.getConfig.and.callFake((key) => key === 'envConfig' ? mockEnvConfig : 'mockChatId');
+
+    configService.getConfig.and.callFake((key) => {
+      if (key === 'envConfig') return mockEnvConfig;
+      if (key === 'chatId') return 'mockChatId';
+      return null;
+    });
 
     service.uploadFile(mockFile).subscribe();
 
@@ -51,16 +57,18 @@ describe('ResponseService - uploadFile', () => {
     expect(formData.get('chatId')).toBe('mockChatId');
     expect(formData.get('socketId')).toBe('mockSocketId');
 
-    req.flush({});
+    req.flush({ success: true }); // Simulating a successful API response
   });
 
   it('should handle missing envConfig and default to 0', () => {
     const mockFile = new File(['dummy content'], 'test.txt', { type: 'text/plain' });
+
     configService.getConfig.and.returnValue(null);
 
     service.uploadFile(mockFile).subscribe();
 
-    const req = httpMock.expectOne('/api/genesys/uploadFile'); // Defaulting to invalid URL
+    // Since envConfig is null, the request should fail to generate a proper URL
+    const req = httpMock.expectOne('/api/genesys/uploadFile');
     expect(req.request.method).toBe('POST');
 
     req.flush({});
@@ -69,7 +77,8 @@ describe('ResponseService - uploadFile', () => {
   it('should handle missing chatId', () => {
     const mockFile = new File(['dummy content'], 'test.txt', { type: 'text/plain' });
     const mockEnvConfig = { baseUrl: 'http://localhost:3000' };
-    configService.getConfig.and.callFake((key) => key === 'envConfig' ? mockEnvConfig : null);
+
+    configService.getConfig.and.callFake((key) => (key === 'envConfig' ? mockEnvConfig : null));
 
     service.uploadFile(mockFile).subscribe();
 
@@ -85,8 +94,9 @@ describe('ResponseService - uploadFile', () => {
   it('should handle missing socketId', () => {
     const mockFile = new File(['dummy content'], 'test.txt', { type: 'text/plain' });
     const mockEnvConfig = { baseUrl: 'http://localhost:3000' };
-    socketService.socket.id = null;
-    configService.getConfig.and.callFake((key) => key === 'envConfig' ? mockEnvConfig : 'mockChatId');
+
+    socketService.socket.id = null; // Simulating missing socket ID
+    configService.getConfig.and.callFake((key) => (key === 'envConfig' ? mockEnvConfig : 'mockChatId'));
 
     service.uploadFile(mockFile).subscribe();
 
