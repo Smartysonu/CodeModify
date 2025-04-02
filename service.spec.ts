@@ -55,61 +55,29 @@ public class CumminsPartDocCADReviseListener extends AbstractCumminsEvents {
     }
 
     /**
-     * Fetches and logs both part revisions (version history) and associated forum threads/posts
-     * for the given part in one method using ForumHelper. It also forwards discussion, topic, 
-     * posting, and subscription to the next revision.
+     * Fetches and logs part revisions and associated forum threads/posts using ForumHelper.
      */
     private void findPartRevisionsAndDiscussions(WTPart part) {
         try {
-            // Fetch the part's version history
-            Iterator<?> revisionIterator = part.getMaster().getVersionHistory();
+            // Accessing forums for the part using ForumHelper.service
+            Enumeration forums = ForumHelper.service.getForum(part); // Fetch forums associated with the part
+            
+            // Iterate through the forums and log details about each forum
+            while (forums.hasMoreElements()) {
+                ForumThread forumThread = (ForumThread) forums.nextElement();
+                LOGGER.debug("Forum Thread: " + forumThread.getName() + " | Thread ID: " + forumThread.getId());
 
-            // Iterate through the history and log each part revision
-            while (revisionIterator.hasNext()) {
-                Versioned versioned = (Versioned) revisionIterator.next();
-                String revisionNumber = versioned.getVersionIdentifier().getValue();
-                String partNumber = part.getNumber(); // Same part number for all revisions
-                LOGGER.debug("Part Number: " + partNumber + " | Revision: " + revisionNumber);
-
-                // Fetch the associated forums or threads using ForumHelper
-                ForumHelper service = ForumHelper.service;
-                Iterator<ForumThread> forumThreads = service.getThreadsForObject(part); // Get threads related to the part
-
-                // Iterate through each forum thread and log associated posts
-                while (forumThreads.hasNext()) {
-                    ForumThread forumThread = forumThreads.next();
-                    LOGGER.debug("Forum Thread: " + forumThread.getName() + " | Thread ID: " + forumThread.getId());
-
-                    // Forward the forum thread and its posts to the new revision
-                    forwardForumToNextRevision(part, forumThread);
-
-                    // Fetch all posts in the thread
-                    Iterator<ForumPost> forumPosts = forumThread.getPosts();
-                    while (forumPosts.hasNext()) {
-                        ForumPost forumPost = forumPosts.next();
-                        LOGGER.debug("Forum Post: " + forumPost.getSubject() + " | Post ID: " + forumPost.getId());
-                    }
-
-                    // Fetch and log the associated topics for each thread
-                    Iterator<ForumTopic> forumTopics = forumThread.getTopics();
-                    while (forumTopics.hasNext()) {
-                        ForumTopic forumTopic = forumTopics.next();
-                        LOGGER.debug("Forum Topic: " + forumTopic.getName() + " | Topic ID: " + forumTopic.getId());
-                    }
-
-                    // Fetch subscriptions related to this forum thread
-                    Iterator<ForumSubscription> forumSubscriptions = forumThread.getSubscriptions();
-                    while (forumSubscriptions.hasNext()) {
-                        ForumSubscription subscription = forumSubscriptions.next();
-                        LOGGER.debug("Forum Subscription: " + subscription.getSubscriber().getName() + " | Subscriber ID: " + subscription.getId());
-                    }
+                // Fetch all posts in the thread
+                Iterator<ForumPost> forumPosts = forumThread.getPosts();
+                while (forumPosts.hasNext()) {
+                    ForumPost forumPost = forumPosts.next();
+                    LOGGER.debug("Forum Post: " + forumPost.getSubject() + " | Post ID: " + forumPost.getId());
                 }
             }
         } catch (WTException e) {
-            LOGGER.error("Error fetching part revision history and discussions for part: " + part.getNumber(), e);
+            LOGGER.error("Error fetching forums and discussions for part: " + part.getNumber(), e);
         }
     }
-
     /**
      * Forwards the forum thread and associated data (topic, posting, subscription) to the next revision of the part.
      */
