@@ -32,14 +32,16 @@ public class CumminsPartReviseListener extends AbstractCumminsEvents {
             if (doOperation) {
                 LOGGER.debug("doOperation Part: " + part.getDisplayIdentity());
 
-                Optional<WTPart> previousPart = getPreviousPart(part);
+                // Handle previous part retrieval with exception handling
+                Optional<WTPart> previousPart = Optional.empty();
+                try {
+                    previousPart = Optional.ofNullable(CumminsValidatePlantItems.getPreviousVersionViewPart(part));
+                    previousPart.ifPresent(p -> LOGGER.debug("Previous Part: " + p));
+                } catch (WTException e) {
+                    LOGGER.debug("No previous part found for part: " + part.getDisplayIdentity(), e);
+                }
 
-                previousPart.ifPresentOrElse(
-                        p -> LOGGER.debug("Previous Part: " + p),
-                        () -> LOGGER.debug("No previous part found")
-                );
-
-                // Retrieve the forums for either the current or previous part
+                // Retrieve forums for either the current or previous part
                 Enumeration forums = (previousPart.isPresent()) ?
                         ForumHelper.service.getForums(previousPart.get()) : ForumHelper.service.getForums(part);
                 LOGGER.debug("forums: " + forums);
@@ -69,20 +71,6 @@ public class CumminsPartReviseListener extends AbstractCumminsEvents {
                     LOGGER.debug("No Forum for Part: " + part.getDisplayIdentity());
                 }
             }
-        }
-    }
-
-    /**
-     * Safely gets the previous part version if available, handling any exceptions.
-     * @param part the current part
-     * @return an Optional containing the previous part, or an empty Optional if not found
-     */
-    private Optional<WTPart> getPreviousPart(WTPart part) {
-        try {
-            return Optional.ofNullable(CumminsValidatePlantItems.getPreviousVersionViewPart(part));
-        } catch (WTException e) {
-            LOGGER.debug("No previous part found for part: " + part.getDisplayIdentity(), e);
-            return Optional.empty();  // Return an empty Optional if an exception occurs
         }
     }
 }
