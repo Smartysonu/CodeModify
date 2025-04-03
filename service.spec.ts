@@ -32,8 +32,8 @@ public class CumminsPartReviseListener extends AbstractCumminsEvents {
             if (doOperation) {
                 LOGGER.debug("doOperation Part: " + part.getDisplayIdentity());
 
-                // Fetch previous part version if available
-                Optional<WTPart> previousPart = Optional.ofNullable(CumminsValidatePlantItems.getPreviousVersionViewPart(part));
+                Optional<WTPart> previousPart = getPreviousPart(part);
+
                 previousPart.ifPresentOrElse(
                         p -> LOGGER.debug("Previous Part: " + p),
                         () -> LOGGER.debug("No previous part found")
@@ -69,6 +69,20 @@ public class CumminsPartReviseListener extends AbstractCumminsEvents {
                     LOGGER.debug("No Forum for Part: " + part.getDisplayIdentity());
                 }
             }
+        }
+    }
+
+    /**
+     * Safely gets the previous part version if available, handling any exceptions.
+     * @param part the current part
+     * @return an Optional containing the previous part, or an empty Optional if not found
+     */
+    private Optional<WTPart> getPreviousPart(WTPart part) {
+        try {
+            return Optional.ofNullable(CumminsValidatePlantItems.getPreviousVersionViewPart(part));
+        } catch (WTException e) {
+            LOGGER.debug("No previous part found for part: " + part.getDisplayIdentity(), e);
+            return Optional.empty();  // Return an empty Optional if an exception occurs
         }
     }
 }
