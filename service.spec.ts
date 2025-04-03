@@ -1,4 +1,5 @@
 package ext.cummins.part.listener;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import ext.cummins.mpml.builder.CumminsValidatePlantItems;
@@ -12,52 +13,62 @@ import wt.vc.wip.WorkInProgressHelper;
 import wt.workflow.forum.DiscussionForum;
 import wt.workflow.forum.DiscussionTopic;
 import wt.workflow.forum.ForumHelper;
-import java.util.Enumeration;
+import java.util.Optional;
 
 public class CumminsPartReviseListener extends AbstractCumminsEvents {
+
     private static final Logger LOGGER = LogManager.getLogger(CumminsPartReviseListener.class);
-@Override
-public void apply(Object obj) throws WTException {
-    LOGGER.debug("in Apply Method CumminsPartReviseListener: " + obj);
-    if (obj instanceof WTPart) {
-        WTPart part = (WTPart) obj;
-        boolean doOperation = !WorkInProgressHelper.isCheckedOut(part) && !WorkInProgressHelper.isWorkingCopy(part);
-        LOGGER.debug("doOperation: " + doOperation);
 
-        if (doOperation) {
-            LOGGER.debug("doOperation Part: " + part.getDisplayIdentity());
+    @Override
+    public void apply(Object obj) throws WTException {
+        LOGGER.debug("in Apply Method CumminsPartReviseListener: " + obj);
 
-            WTPart previousPart = null;
-            Enumeration forums = null;
-            try {
-                previousPart = CumminsValidatePlantItems.getPreviousVersionViewPart(part);
-                LOGGER.debug("Previous Part: " + previousPart);
-            } catch (Exception e) {
-                LOGGER.debug("no part found", e);
-            }
+        if (obj instanceof WTPart) {
+            WTPart part = (WTPart) obj;
+            boolean doOperation = !(WorkInProgressHelper.isCheckedOut(part) || WorkInProgressHelper.isWorkingCopy(part));
+            LOGGER.debug("doOperation: " + doOperation);
 
-            forums = (previousPart != null) ? ForumHelper.service.getForums(previousPart) : ForumHelper.service.getForums(part);
-            LOGGER.debug("forums: " + forums);
+            if (doOperation) {
+                LOGGER.debug("doOperation Part: " + part.getDisplayIdentity());
 
-            if (forums.hasMoreElements()) {
-                DiscussionForum forum = (DiscussionForum) forums.nextElement();
-                DiscussionForum newDiscussionForum = ForumHelper.service.createForum(
-                        forum.getParent().getDefinition().getName(), forum.getName(), part, null);
-                newDiscussionForum = ForumHelper.service.saveForum(part.getContainer(), newDiscussionForum);
-                LOGGER.debug("newDiscussionForum: " + newDiscussionForum);
-                Enumeration topics = forum.getTopics();
-                while (topics.hasMoreElements()) {
-                    DiscussionTopic topic = (DiscussionTopic) topics.nextElement();
-                    QueryResult postings = (QueryResult) topic.getPostings();
-                    LOGGER.debug("topic: " + topic);
-                    LOGGER.debug("postings: " + postings);
-                    // Call Create Forum,Discussion,Posting Method
-                  CumminsCNReviseFormProcessor.createForumTopicPostingOnNewRevision(part, newDiscussionForum, topic, postings);
+                Optional<WTPart> previousPart = Optional.ofNullable(CumminsValidatePlantItems.getPreviousVersionViewPart(part));
+                previousPart.ifPresentOrElse(
+                        p -> LOGGER.debug("Previous Part: " + p),
+                        () -> LOGGER.debug("No previous part found")
+                );
+
+                // Fetch forums for either the previous part or the current part
+                Iterable<DiscussionForum> forums = (previousPart.isPresent()) ?
+                        ForumHelper.service.getForums(previousPart.get()) :
+                        ForumHelper.service.getForums(part);
+
+                forums.forEach(forum -> {
+                    LOGGER.debug("Forum: " + forum.getName());
+                    try {
+                        // Create a new discussion forum for the new part revision
+                        DiscussionForum newDiscussionForum = ForumHelper.service.createForum(
+                                forum.getParent().getDefinition().getName(), forum.getName(), part, null);
+                        newDiscussionForum = ForumHelper.service.saveForum(part.getContainer(), newDiscussionForum);
+                        LOGGER.debug("Created new discussion forum: " + newDiscussionForum);
+
+                        // Handle topics and postings within the forum
+                        forum.getTopics().forEachRemaining(topic -> {
+                            QueryResult postings = (QueryResult) topic.getPostings();
+                            LOGGER.debug("Topic: " + topic);
+                            LOGGER.debug("Postings: " + postings);
+                            CumminsCNReviseFormProcessor.createForumTopicPostingOnNewRevision(part, newDiscussionForum, topic, postings);
+                        });
+
+                    } catch (WTException e) {
+                        LOGGER.error("Error processing forum for part: " + part.getDisplayIdentity(), e);
+                    }
+                });
+
+                // If no forums were found, log the message
+                if (!forums.iterator().hasNext()) {
+                    LOGGER.debug("No Forum for Part: " + part.getDisplayIdentity());
                 }
-            } else {
-                LOGGER.debug("No Forum for Part: " + part.getDisplayIdentity());
             }
         }
     }
-  }
 }
