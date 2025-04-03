@@ -60,4 +60,15 @@ public class CumminsPartReviseListener extends AbstractCumminsEvents {
                             QueryResult postings = (QueryResult) topic.getPostings();
                             LOGGER.debug("Topic: " + topic);
                             LOGGER.debug("Postings: " + postings);
-                            CumminsCNReviseFormProcessor.create
+                            CumminsCNReviseFormProcessor.createForumTopicPostingOnNewRevision(part, newDiscussionForum, topic, postings);
+                        }
+                    } catch (WTException e) {
+                        LOGGER.error("Error processing forum for part: " + part.getDisplayIdentity(), e);
+                    }
+                } else {
+                    LOGGER.debug("No Forum for Part: " + part.getDisplayIdentity());
+                }
+            }
+        }
+    }
+}
