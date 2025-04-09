@@ -1,0 +1,636 @@
+2025-04-10T00:00:18.791834+05:30
+WARNING: Waiting on CRSD for password file, for 8 seconds, check CRS and OS logs
+WARNING: Waiting on CRSD for password file, for 8 seconds, check CRS and OS logs
+Starting ORACLE instance (normal) (OS id: 21004)
+2025-04-10T00:00:18.808961+05:30
+All SGA segments were allocated at startup
+Using an SGA granule size of 64MB
+Memory protection keys NOT enabled.
+LICENSE_MAX_SESSION = 0
+LICENSE_SESSIONS_WARNING = 0
+Initial number of CPU is 32
+Number of processor cores in the system is 24
+Number of processor sockets in the system is 1
+Shared memory segment for instance monitoring created
+Capability Type : Network 
+capabilities requested : F detected : 0 Simulated : 0
+Capability Type : Runtime Environment 
+capabilities requested : 400000FF detected : 40000000 Simulated : 0
+Capability Type : Engineered Systems 
+capabilities requested : F detected : 0 Simulated : 0
+Capability Type : Database Test 
+capabilities requested : 3 detected : 0 Simulated : 0
+Capability Type : Database Editions 
+capabilities requested : 1CC detected : 8 Simulated : 0
+Using LOG_ARCHIVE_DEST_1 parameter default value as USE_DB_RECOVERY_FILE_DEST
+Autotune of undo retention is turned on. 
+IMODE=BR
+ILAT =425
+LICENSE_MAX_USERS = 0
+SYS auditing is enabled
+NOTE: remote asm mode is local (mode 0x1; from cluster type)
+2025-04-10T00:00:22.670391+05:30
+NOTE: Using default ASM root directory ASM
+NOTE: remote asm mode is local (mode 0x1; from cluster type)
+NOTE: Cluster configuration type = NONE [2]
+NOTE: initializing MDS service with 1 containers
+Oracle Database 21c Enterprise Edition Release 21.0.0.0.0 - Production
+Version 21.3.0.0.0.
+Windows NT Version V10.0  OS Build 19045
+ORACLE_HOME = E:\Oracle21C\WINDOWS.X64_213000_db_home
+Node name           : W1-A1022345
+CPU                 : 32 - type 866424 physical cores
+Process Affinity    : 0x0000000000000000
+Memory (Avail/Total): Ph:48214M/65220M, Ph+PgF:39968M/74948M 
+Using parameter settings in client-side pfile E:\ORACLE21C\APP\XN469\CFGTOOLLOGS\DBCA\WIND\INITWINDTEMPOMF.ORA on machine W1-A1022345
+System parameters with non-default values:
+  processes                = 2560
+  sga_target               = 19584M
+  control_files            = "E:\ORACLE21C\APP\XN469\CFGTOOLLOGS\DBCA\WIND\TEMPCONTROL.CTL"
+  db_block_size            = 8192
+  compatible               = "21.0.0"
+  db_create_file_dest      = "E:\Oracle21C\app\xn469\oradata"
+  db_recovery_file_dest    = "E:\Oracle21C\app\xn469\fast_recovery_area"
+  db_recovery_file_dest_size= 13836M
+  undo_tablespace          = "UNDOTBS1"
+  remote_login_passwordfile= "EXCLUSIVE"
+  dispatchers              = "(PROTOCOL=TCP) (SERVICE=WindXDB)"
+  audit_file_dest          = "E:\ORACLE21C\APP\XN469\ADMIN\WIND\ADUMP"
+  audit_trail              = "DB"
+  db_name                  = "seeddata"
+  db_unique_name           = "Wind"
+  open_cursors             = 300
+  pga_aggregate_target     = 6522M
+  _diag_hm_rc_enabled      = FALSE
+  diagnostic_dest          = "E:\ORACLE21C\APP\XN469"
+  enable_pluggable_database= TRUE
+2025-04-10T00:00:22.949997+05:30
+Broadcast on commit is enabled and is using Message mode.
+2025-04-10T00:00:24.338971+05:30
+Starting background process PMON
+2025-04-10T00:00:24.361491+05:30
+PMON started with pid=2, OS id=30324_27576 
+Starting background process CLMN
+2025-04-10T00:00:24.361491+05:30
+CLMN started with pid=4, OS id=30324_16984 
+Starting background process PSP0
+2025-04-10T00:00:24.381614+05:30
+PSP0 started with pid=5, OS id=30324_29576 
+Starting background process VKTM
+2025-04-10T00:00:24.453894+05:30
+VKTM started with pid=6, OS id=30324_19608 at elevated (Time Critical) priority
+2025-04-10T00:00:24.453894+05:30
+VKTM running at (5)millisec precision with DBRM quantum (100)ms
+Starting background process GEN0
+2025-04-10T00:00:24.523057+05:30
+GEN0 started with pid=7, OS id=30324_5792 
+Starting background process MMAN
+2025-04-10T00:00:24.586309+05:30
+MMAN started with pid=8, OS id=30324_23668 
+Starting background process GEN1
+Starting background process GEN2
+Starting background process VOSD
+Starting background process DIAG
+Starting background process DBRM
+Starting background process VKRM
+Starting background process SVCB
+2025-04-10T00:00:24.612472+05:30
+VOSD started with pid=12, OS id=30324_17796 
+2025-04-10T00:00:24.628111+05:30
+DIAG started with pid=13, OS id=30324_23752 
+2025-04-10T00:00:24.628111+05:30
+VKRM started with pid=15, OS id=30324_19160 
+2025-04-10T00:00:24.633568+05:30
+DBRM started with pid=14, OS id=30324_11436 
+2025-04-10T00:00:24.634653+05:30
+SVCB started with pid=16, OS id=30324_17444 
+2025-04-10T00:00:24.682585+05:30
+GEN1 started with pid=10, OS id=30324_30220 
+2025-04-10T00:00:24.739102+05:30
+GEN2 started with pid=11, OS id=30324_29832 
+Starting background process PMAN
+Starting background process DIA0
+Starting background process DBW0
+Starting background process DBW1
+Starting background process DBW2
+Starting background process DBW3
+Starting background process LGWR
+Starting background process CKPT
+Starting background process SMON
+Starting background process SMCO
+Starting background process RECO
+Starting background process LREG
+Starting background process PXMN
+Starting background process FENC
+2025-04-10T00:00:24.823788+05:30
+LGWR started with pid=23, OS id=30324_27668 
+2025-04-10T00:00:24.823788+05:30
+SMON started with pid=25, OS id=30324_23144 
+2025-04-10T00:00:24.823788+05:30
+SMCO started with pid=26, OS id=30324_29928 
+2025-04-10T00:00:24.823788+05:30
+CKPT started with pid=24, OS id=30324_21072 
+2025-04-10T00:00:24.823788+05:30
+LREG started with pid=28, OS id=30324_17872 
+2025-04-10T00:00:24.823788+05:30
+PXMN started with pid=29, OS id=30324_10900 
+2025-04-10T00:00:24.823788+05:30
+FENC started with pid=30, OS id=30324_7124 
+2025-04-10T00:00:24.870734+05:30
+PMAN started with pid=17, OS id=30324_27460 
+2025-04-10T00:00:24.886359+05:30
+DBW0 started with pid=19, OS id=30324_4956 
+2025-04-10T00:00:24.886359+05:30
+DBW2 started with pid=21, OS id=30324_23748 
+2025-04-10T00:00:24.924289+05:30
+DIA0 started with pid=18, OS id=30324_18852 
+2025-04-10T00:00:24.939907+05:30
+RECO started with pid=27, OS id=30324_7144 
+Starting background process MMON
+Starting background process MMNL
+2025-04-10T00:00:25.008998+05:30
+MMON started with pid=37, OS id=30324_6700 
+2025-04-10T00:00:25.008998+05:30
+MMNL started with pid=38, OS id=30324_23188 
+2025-04-10T00:00:25.008998+05:30
+LGWR slave LG00 created with pid=39, OS pid=30324_23440
+LGWR slave LG01 created with pid=41, OS pid=30324_18952
+2025-04-10T00:00:25.055962+05:30
+DBW1 started with pid=20, OS id=30324_28576 
+2025-04-10T00:00:25.072605+05:30
+starting up 1 dispatcher(s) for network address '(ADDRESS=(PARTIAL=YES)(PROTOCOL=TCP))'...
+2025-04-10T00:00:25.072605+05:30
+starting up 1 shared server(s) ...
+Starting background process TMON
+2025-04-10T00:00:25.088312+05:30
+TMON started with pid=45, OS id=30324_23660 
+2025-04-10T00:00:25.124743+05:30
+DBW3 started with pid=22, OS id=30324_13768 
+2025-04-10T00:00:26.102368+05:30
+RACD notifier running level=0
+ORACLE_BASE from environment = E:\Oracle21C\app\xn469
+2025-04-10T00:00:27.403761+05:30
+ALTER DATABASE   MOUNT
+2025-04-10T00:00:27.424641+05:30
+Set as converted control file due to db_unique_name mismatch
+Changing di2dbun from seeddata to Wind
+.... (PID:30324_21860): RT: Role transition work is not done [kcrr.c:2485]
+2025-04-10T00:00:27.435075+05:30
+Successful mount of redo thread 1, with mount id 231731675
+2025-04-10T00:00:27.445451+05:30
+Database mounted in Exclusive Mode
+Lost write protection disabled
+Create Relation IPS_PACKAGE_UNPACK_HISTORY
+Completed: ALTER DATABASE   MOUNT
+2025-04-10T00:00:27.899315+05:30
+Using default pga_aggregate_limit of 13044 MB
+2025-04-10T00:00:28.174088+05:30
+db_recovery_file_dest_size of 13836 MB is 0.00% used. This is a
+user-specified limit on the amount of space that will be used by this
+database for recovery-related files, and does not reflect the amount of
+space available in the underlying filesystem or ASM diskgroup.
+2025-04-10T00:01:01.889530+05:30
+Full restore complete of datafile 1 to datafile copy E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_SYSTEM_MZFH6G4D_.DBF.  Elapsed time: 0:00:23
+  checkpoint is 2744889
+  last deallocation scn is 2737672
+  Undo Optimization current scn is 2739652
+2025-04-10T00:01:14.174180+05:30
+Full restore complete of datafile 3 to datafile copy E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_SYSAUX_MZFH77BD_.DBF.  Elapsed time: 0:00:11
+  checkpoint is 2744889
+  last deallocation scn is 2743780
+2025-04-10T00:01:18.589428+05:30
+Full restore complete of datafile 4 to datafile copy E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_UNDOTBS1_MZFH7PGM_.DBF.  Elapsed time: 0:00:00
+  checkpoint is 2744889
+  last deallocation scn is 3
+2025-04-10T00:01:19.711443+05:30
+Full restore complete of datafile 7 to datafile copy E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_USERS_MZFH7QLM_.DBF.  Elapsed time: 0:00:00
+  checkpoint is 2744889
+  last deallocation scn is 3
+2025-04-10T00:01:20.824174+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_5164.trc:
+ORA-19625: error identifying file C:\ADE\AIME_V\ORACLE\ORADATA\SEEDDATA\SYSTEM01.DBF
+ORA-27041: unable to open file
+OSD-04002: unable to open file
+O/S-Error: (OS 3) The system cannot find the path specified.
+2025-04-10T00:01:20.846474+05:30
+Switch of datafile 1 complete to datafile copy 
+  checkpoint is 2744889
+2025-04-10T00:01:20.862100+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_5164.trc:
+ORA-19625: error identifying file C:\ADE\AIME_V\ORACLE\ORADATA\SEEDDATA\SYSAUX01.DBF
+ORA-27041: unable to open file
+OSD-04002: unable to open file
+O/S-Error: (OS 3) The system cannot find the path specified.
+Switch of datafile 3 complete to datafile copy 
+  checkpoint is 2744889
+2025-04-10T00:01:20.877724+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_5164.trc:
+ORA-19625: error identifying file C:\ADE\AIME_V\ORACLE\ORADATA\SEEDDATA\UNDOTBS01.DBF
+ORA-27041: unable to open file
+OSD-04002: unable to open file
+O/S-Error: (OS 3) The system cannot find the path specified.
+Switch of datafile 4 complete to datafile copy 
+  checkpoint is 2744889
+2025-04-10T00:01:20.893350+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_5164.trc:
+ORA-19625: error identifying file C:\ADE\AIME_V\ORACLE\ORADATA\SEEDDATA\USERS01.DBF
+ORA-27041: unable to open file
+OSD-04002: unable to open file
+O/S-Error: (OS 3) The system cannot find the path specified.
+Switch of datafile 7 complete to datafile copy 
+  checkpoint is 2744889
+2025-04-10T00:01:22.219169+05:30
+zeroing database id of data file (0): E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_SYSTEM_MZFH6G4D_.DBF
+zeroing database id of data file (0): E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_SYSAUX_MZFH77BD_.DBF
+zeroing database id of data file (0): E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_UNDOTBS1_MZFH7PGM_.DBF
+zeroing database id of data file (0): E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_USERS_MZFH7QLM_.DBF
+Shutting down ORACLE instance (immediate) (OS id: 30324_14296)
+Shutdown is initiated by sqlplus.exe.
+Stopping background process SMCO
+Shutting down instance: further logons disabled
+Stopping background process MMNL
+Stopping background process MMON
+License high water mark = 4
+Dispatchers and shared servers shutdown
+
+Data Pump shutdown in progress
+2025-04-10T00:01:23.608490+05:30
+ALTER DATABASE CLOSE NORMAL
+2025-04-10T00:01:23.608490+05:30
+Stopping Emon pool
+ORA-1109 signalled during: ALTER DATABASE CLOSE NORMAL...
+ALTER DATABASE DISMOUNT
+Completed: ALTER DATABASE DISMOUNT
+
+IM on ADG: Start of Empty Journal 
+
+IM on ADG: End of Empty Journal 
+JIT: pid 30324 requesting stop
+2025-04-10T00:01:23.655302+05:30
+Stopping background process VKTM
+2025-04-10T00:01:23.725237+05:30
+JIT: pid 30324 requesting stop
+2025-04-10T00:01:24.346635+05:30
+Instance shutdown complete (OS id: 30324_14296)
+2025-04-10T00:01:41.483281+05:30
+WARNING: Waiting on CRSD for password file, for 8 seconds, check CRS and OS logs
+WARNING: Waiting on CRSD for password file, for 8 seconds, check CRS and OS logs
+Starting ORACLE instance (normal) (OS id: 2448)
+2025-04-10T00:01:41.498904+05:30
+All SGA segments were allocated at startup
+Using an SGA granule size of 64MB
+Memory protection keys NOT enabled.
+LICENSE_MAX_SESSION = 0
+LICENSE_SESSIONS_WARNING = 0
+Initial number of CPU is 32
+Number of processor cores in the system is 24
+Number of processor sockets in the system is 1
+Capability Type : Network 
+capabilities requested : F detected : 0 Simulated : 0
+Capability Type : Runtime Environment 
+capabilities requested : 400000FF detected : 40000000 Simulated : 0
+Capability Type : Engineered Systems 
+capabilities requested : F detected : 0 Simulated : 0
+Capability Type : Database Test 
+capabilities requested : 3 detected : 0 Simulated : 0
+Capability Type : Database Editions 
+capabilities requested : 1CC detected : 8 Simulated : 0
+Using LOG_ARCHIVE_DEST_1 parameter default value as USE_DB_RECOVERY_FILE_DEST
+Autotune of undo retention is turned on. 
+IMODE=BR
+ILAT =425
+LICENSE_MAX_USERS = 0
+SYS auditing is enabled
+NOTE: remote asm mode is local (mode 0x1; from cluster type)
+2025-04-10T00:01:44.696188+05:30
+NOTE: Using default ASM root directory ASM
+NOTE: remote asm mode is local (mode 0x1; from cluster type)
+NOTE: Cluster configuration type = NONE [2]
+NOTE: initializing MDS service with 1 containers
+Oracle Database 21c Enterprise Edition Release 21.0.0.0.0 - Production
+Version 21.3.0.0.0.
+Windows NT Version V10.0  OS Build 19045
+ORACLE_HOME = E:\Oracle21C\WINDOWS.X64_213000_db_home
+Node name           : W1-A1022345
+CPU                 : 32 - type 866424 physical cores
+Process Affinity    : 0x0000000000000000
+Memory (Avail/Total): Ph:48232M/65220M, Ph+PgF:39960M/74948M 
+Using parameter settings in client-side pfile E:\ORACLE21C\APP\XN469\CFGTOOLLOGS\DBCA\WIND\INITWINDTEMP.ORA on machine W1-A1022345
+System parameters with non-default values:
+  processes                = 2560
+  sga_target               = 19584M
+  db_block_size            = 8192
+  compatible               = "21.0.0"
+  db_create_file_dest      = "E:\Oracle21C\app\xn469\oradata"
+  db_recovery_file_dest    = "E:\Oracle21C\app\xn469\fast_recovery_area"
+  db_recovery_file_dest_size= 13836M
+  _no_recovery_through_resetlogs= TRUE
+  undo_tablespace          = "UNDOTBS1"
+  remote_login_passwordfile= "EXCLUSIVE"
+  dispatchers              = "(PROTOCOL=TCP) (SERVICE=WindXDB)"
+  job_queue_processes      = 0
+  audit_file_dest          = "E:\ORACLE21C\APP\XN469\ADMIN\WIND\ADUMP"
+  audit_trail              = "DB"
+  db_name                  = "Wind"
+  open_cursors             = 300
+  pga_aggregate_target     = 6522M
+  aq_tm_processes          = 0
+  _enable_automatic_maintenance= 0
+  _diag_hm_rc_enabled      = FALSE
+  diagnostic_dest          = "E:\ORACLE21C\APP\XN469"
+  enable_pluggable_database= TRUE
+2025-04-10T00:01:44.838286+05:30
+Broadcast on commit is enabled and is using Message mode.
+2025-04-10T00:01:46.110356+05:30
+Starting background process PMON
+2025-04-10T00:01:46.125983+05:30
+PMON started with pid=2, OS id=30324_20780 
+Starting background process CLMN
+2025-04-10T00:01:46.134546+05:30
+CLMN started with pid=4, OS id=30324_28732 
+Starting background process PSP0
+2025-04-10T00:01:46.144729+05:30
+PSP0 started with pid=5, OS id=30324_28756 
+Starting background process VKTM
+2025-04-10T00:01:46.205546+05:30
+VKTM started with pid=6, OS id=30324_29272 at elevated (Time Critical) priority
+2025-04-10T00:01:46.213556+05:30
+VKTM running at (5)millisec precision with DBRM quantum (100)ms
+Starting background process GEN0
+2025-04-10T00:01:46.276917+05:30
+GEN0 started with pid=7, OS id=30324_29260 
+Starting background process MMAN
+2025-04-10T00:01:46.348644+05:30
+MMAN started with pid=8, OS id=30324_28728 
+Starting background process GEN1
+Starting background process GEN2
+Starting background process VOSD
+Starting background process DIAG
+Starting background process DBRM
+Starting background process VKRM
+Starting background process SVCB
+Starting background process PMAN
+2025-04-10T00:01:46.369126+05:30
+GEN1 started with pid=10, OS id=30324_29964 
+2025-04-10T00:01:46.377181+05:30
+GEN2 started with pid=11, OS id=30324_30028 
+2025-04-10T00:01:46.377181+05:30
+VOSD started with pid=12, OS id=30324_30088 
+2025-04-10T00:01:46.379243+05:30
+VKRM started with pid=15, OS id=30324_29784 
+2025-04-10T00:01:46.379243+05:30
+DBRM started with pid=14, OS id=30324_29756 
+2025-04-10T00:01:46.379243+05:30
+SVCB started with pid=16, OS id=30324_15168 
+Starting background process DIA0
+Starting background process DBW0
+Starting background process DBW1
+Starting background process DBW2
+Starting background process DBW3
+Starting background process LGWR
+Starting background process CKPT
+Starting background process SMON
+2025-04-10T00:01:46.438221+05:30
+DIA0 started with pid=18, OS id=30324_27580 
+2025-04-10T00:01:46.440347+05:30
+DBW0 started with pid=19, OS id=30324_26776 
+2025-04-10T00:01:46.440347+05:30
+DBW1 started with pid=20, OS id=30324_2940 
+2025-04-10T00:01:46.440347+05:30
+DBW2 started with pid=21, OS id=30324_19816 
+2025-04-10T00:01:46.440347+05:30
+CKPT started with pid=24, OS id=30324_20900 
+2025-04-10T00:01:46.440347+05:30
+SMON started with pid=25, OS id=30324_29812 
+2025-04-10T00:01:46.448647+05:30
+DIAG started with pid=13, OS id=30324_24156 
+Starting background process SMCO
+Starting background process RECO
+Starting background process LREG
+Starting background process PXMN
+Starting background process FENC
+Starting background process MMON
+Starting background process MMNL
+2025-04-10T00:01:46.499430+05:30
+SMCO started with pid=26, OS id=30324_27600 
+2025-04-10T00:01:46.499430+05:30
+RECO started with pid=27, OS id=30324_29948 
+2025-04-10T00:01:46.501449+05:30
+LREG started with pid=28, OS id=30324_22108 
+2025-04-10T00:01:46.501449+05:30
+PXMN started with pid=29, OS id=30324_1876 
+2025-04-10T00:01:46.501449+05:30
+FENC started with pid=30, OS id=30324_30648 
+2025-04-10T00:01:46.501449+05:30
+MMON started with pid=31, OS id=30324_29936 
+2025-04-10T00:01:46.501449+05:30
+MMNL started with pid=32, OS id=30324_3588 
+2025-04-10T00:01:46.509616+05:30
+DBW3 started with pid=22, OS id=30324_3188 
+2025-04-10T00:01:46.571046+05:30
+PMAN started with pid=17, OS id=30324_4232 
+2025-04-10T00:01:46.632417+05:30
+starting up 1 dispatcher(s) for network address '(ADDRESS=(PARTIAL=YES)(PROTOCOL=TCP))'...
+starting up 1 shared server(s) ...
+Starting background process TMON
+2025-04-10T00:01:46.654849+05:30
+TMON started with pid=43, OS id=30324_29588 
+2025-04-10T00:01:46.688222+05:30
+LGWR started with pid=23, OS id=30324_27364 
+2025-04-10T00:01:46.696908+05:30
+LGWR slave LG00 created with pid=45, OS pid=30324_28488
+LGWR slave LG01 created with pid=46, OS pid=30324_30544
+2025-04-10T00:01:47.670529+05:30
+RACD notifier running level=0
+ORACLE_BASE from environment = E:\Oracle21C\app\xn469
+2025-04-10T00:01:48.760222+05:30
+Create controlfile reuse set database "Wind"
+MAXINSTANCES 8
+MAXLOGHISTORY 1
+MAXLOGFILES 16
+MAXLOGMEMBERS 3
+MAXDATAFILES 1024
+Datafile
+'E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_SYSAUX_MZFH77BD_.DBF',
+'E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_SYSTEM_MZFH6G4D_.DBF',
+'E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_UNDOTBS1_MZFH7PGM_.DBF',
+'E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_USERS_MZFH7QLM_.DBF'
+LOGFILE GROUP 1  SIZE 200M,
+GROUP 2  SIZE 200M,
+GROUP 3  SIZE 200M RESETLOGS
+2025-04-10T00:01:48.768268+05:30
+WARNING: Default Temporary Tablespace not specified in CREATE DATABASE command
+Default Temporary Tablespace will be necessary for a locally managed database in future release
+.... (PID:30324_29248): RT: Role transition work is not done [kcrr.c:2485]
+Expanded controlfile section 32 from 31 to 128 records
+Requested to grow by 97 records; added 3 blocks of records
+2025-04-10T00:01:48.902195+05:30
+Successful mount of redo thread 1, with mount id 1051338092
+Completed: Create controlfile reuse set database "Wind"
+MAXINSTANCES 8
+MAXLOGHISTORY 1
+MAXLOGFILES 16
+MAXLOGMEMBERS 3
+MAXDATAFILES 1024
+Datafile
+'E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_SYSAUX_MZFH77BD_.DBF',
+'E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_SYSTEM_MZFH6G4D_.DBF',
+'E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_UNDOTBS1_MZFH7PGM_.DBF',
+'E:\ORACLE21C\APP\XN469\ORADATA\WIND\DATAFILE\O1_MF_USERS_MZFH7QLM_.DBF'
+LOGFILE GROUP 1  SIZE 200M,
+GROUP 2  SIZE 200M,
+GROUP 3  SIZE 200M RESETLOGS
+Stopping background process MMNL
+Stopping background process MMON
+Starting background process MMNL
+2025-04-10T00:01:49.034388+05:30
+MMNL started with pid=30, OS id=30324_20740 
+Starting background process MMON
+2025-04-10T00:01:49.095321+05:30
+MMON started with pid=31, OS id=30324_28688 
+2025-04-10T00:01:49.154232+05:30
+Stopping Emon pool
+2025-04-10T00:01:49.154232+05:30
+ALTER SYSTEM enable restricted session;
+alter database "Wind" open resetlogs
+RESETLOGS after incomplete recovery UNTIL CHANGE 2744889 time 09/28/2021 08:43:02
+2025-04-10T00:01:49.179864+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_29248.trc:
+ORA-00313: open failed for members of log group 1 of thread 1
+2025-04-10T00:01:49.179864+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_29248.trc:
+ORA-00313: open failed for members of log group 1 of thread 1
+.... (PID:30324_29248): Clearing online redo logfile 1 E:\ORACLE21C\APP\XN469\ORADATA\WIND\ONLINELOG\O1_MF_1_%U_.LOG
+ [kcrf.c:3426]
+2025-04-10T00:01:49.195487+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_29248.trc:
+ORA-00313: open failed for members of log group 2 of thread 1
+2025-04-10T00:01:49.195487+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_29248.trc:
+ORA-00313: open failed for members of log group 2 of thread 1
+.... (PID:30324_29248): Clearing online redo logfile 2 E:\ORACLE21C\APP\XN469\ORADATA\WIND\ONLINELOG\O1_MF_2_%U_.LOG
+ [kcrf.c:3426]
+2025-04-10T00:01:49.211111+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_29248.trc:
+ORA-00313: open failed for members of log group 3 of thread 1
+2025-04-10T00:01:49.211111+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_29248.trc:
+ORA-00313: open failed for members of log group 3 of thread 1
+.... (PID:30324_29248): Clearing online redo logfile 3 E:\ORACLE21C\APP\XN469\ORADATA\WIND\ONLINELOG\O1_MF_3_%U_.LOG
+ [kcrf.c:3426]
+Clearing online log 1 of thread 1 sequence number 0
+2025-04-10T00:01:49.211111+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_29248.trc:
+ORA-00313: open failed for members of log group 1 of thread 1
+2025-04-10T00:01:49.211111+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_29248.trc:
+ORA-00313: open failed for members of log group 1 of thread 1
+Clearing online log 2 of thread 1 sequence number 0
+2025-04-10T00:01:49.211111+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_29248.trc:
+ORA-00313: open failed for members of log group 2 of thread 1
+2025-04-10T00:01:49.226794+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_29248.trc:
+ORA-00313: open failed for members of log group 2 of thread 1
+Clearing online log 3 of thread 1 sequence number 0
+2025-04-10T00:01:49.226794+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_29248.trc:
+ORA-00313: open failed for members of log group 3 of thread 1
+2025-04-10T00:01:49.226794+05:30
+Errors in file E:\ORACLE21C\APP\XN469\diag\rdbms\wind\wind\trace\wind_ora_30324_29248.trc:
+ORA-00313: open failed for members of log group 3 of thread 1
+2025-04-10T00:01:49.380450+05:30
+Using default pga_aggregate_limit of 13044 MB
+2025-04-10T00:01:49.659148+05:30
+.... (PID:30324_29248): Clearing online redo logfile 1 complete [kcrf.c:3604]
+.... (PID:30324_29248): Clearing online redo logfile 2 complete [kcrf.c:3604]
+.... (PID:30324_29248): Clearing online redo logfile 3 complete [kcrf.c:3604]
+Online log E:\ORACLE21C\APP\XN469\ORADATA\WIND\ONLINELOG\O1_MF_1_MZFH8O72_.LOG: Thread 1 Group 1 was previously cleared
+Online log E:\ORACLE21C\APP\XN469\FAST_RECOVERY_AREA\WIND\ONLINELOG\O1_MF_1_MZFH8OFC_.LOG: Thread 1 Group 1 was previously cleared
+Online log E:\ORACLE21C\APP\XN469\ORADATA\WIND\ONLINELOG\O1_MF_2_MZFH8O7L_.LOG: Thread 1 Group 2 was previously cleared
+Online log E:\ORACLE21C\APP\XN469\FAST_RECOVERY_AREA\WIND\ONLINELOG\O1_MF_2_MZFH8OFC_.LOG: Thread 1 Group 2 was previously cleared
+Online log E:\ORACLE21C\APP\XN469\ORADATA\WIND\ONLINELOG\O1_MF_3_MZFH8O7L_.LOG: Thread 1 Group 3 was previously cleared
+Online log E:\ORACLE21C\APP\XN469\FAST_RECOVERY_AREA\WIND\ONLINELOG\O1_MF_3_MZFH8OFT_.LOG: Thread 1 Group 3 was previously cleared
+2025-04-10T00:01:49.737014+05:30
+Setting recovery target incarnation to 2
+2025-04-10T00:01:49.898546+05:30
+Smart fusion block transfer is disabled:
+  instance mounted in exclusive mode.
+Buffer Cache Full DB Caching mode changing from FULL CACHING DISABLED to FULL CACHING ENABLED 
+Initializing SCN for created control file
+Database SCN compatibility initialized to 3
+Endian type of dictionary set to little
+2025-04-10T00:01:49.918818+05:30
+Assigning activation ID 1051338092 (0x3eaa256c)
+Redo log for group 1, sequence 1 is not located on DAX storage
+Thread 1 opened at log sequence 1
+  Current log# 1 seq# 1 mem# 0: E:\ORACLE21C\APP\XN469\ORADATA\WIND\ONLINELOG\O1_MF_1_MZFH8O72_.LOG
+  Current log# 1 seq# 1 mem# 1: E:\ORACLE21C\APP\XN469\FAST_RECOVERY_AREA\WIND\ONLINELOG\O1_MF_1_MZFH8OFC_.LOG
+Successful open of redo thread 1
+2025-04-10T00:01:49.979601+05:30
+MTTR advisory is disabled because FAST_START_MTTR_TARGET is not set
+Stopping change tracking
+Undo initialization recovery: Parallel FPTR complete: start:4539640 end:4539640 diff:0 ms (0.0 seconds)
+Undo initialization recovery: err:0 start: 4539640 end: 4539640 diff: 0 ms (0.0 seconds)
+[30324_29248] Successfully onlined Undo Tablespace 2.
+Undo initialization online undo segments: err:0 start: 4539656 end: 4539687 diff: 31 ms (0.0 seconds)
+Undo initialization finished serial:0 start:4539640 end:4539687 diff:47 ms (0.0 seconds)
+Dictionary check beginning
+Tablespace 'TEMP' #3 found in data dictionary,
+but not in the controlfile. Adding to controlfile.
+Dictionary check complete
+*********************************************************************
+WARNING: The following temporary tablespaces in container(CDB$ROOT)
+         contain no files.
+         This condition can occur when a backup controlfile has
+         been restored.  It may be necessary to add files to these
+         tablespaces.  That can be done using the SQL statement:
+ 
+         ALTER TABLESPACE <tablespace_name> ADD TEMPFILE
+ 
+         Alternatively, if these temporary tablespaces are no longer
+         needed, then they can be dropped.
+           Empty temporary tablespace: TEMP
+*********************************************************************
+Database Characterset is US7ASCII
+No Resource Manager plan active
+**********************************************************
+WARNING: Files may exists in db_recovery_file_dest
+that are not known to the database. Use the RMAN command
+CATALOG RECOVERY AREA to re-catalog any such files.
+If files cannot be cataloged, then manually delete them
+using OS command.
+One of the following events caused this:
+1. A backup controlfile was restored.
+2. A standby controlfile was restored.
+3. The controlfile was re-created.
+4. db_recovery_file_dest had previously been enabled and
+   then disabled.
+**********************************************************
+joxcsys_required_dirobj_exists: directory object exists with wrong path C:\ADE\AIME_V\ORACLE\JAVAVM\ADMIN\, required path is E:\ORACLE21C\WINDOWS.X64_213000_DB_HOME\JAVAVM\ADMIN\, pid 30324 cid 1
+joxcsys_ensure_directory_object: created directory object with path E:\ORACLE21C\WINDOWS.X64_213000_DB_HOME\JAVAVM\ADMIN\, pid 30324 cid 1
+Starting background process RCBG
+2025-04-10T00:01:50.551160+05:30
+RCBG started with pid=51, OS id=30324_23432 
+replication_dependency_tracking turned off (no async multimaster replication found)
+LOGSTDBY: Validating controlfile with logical metadata
+LOGSTDBY: Validation complete
+AQ Processes can not start in restrict mode
+2025-04-10T00:01:50.899956+05:30
+db_recovery_file_dest_size of 13836 MB is 4.48% used. This is a
+user-specified limit on the amount of space that will be used by this
+database for recovery-related files, and does not reflect the amount of
+space available in the underlying filesystem or ASM diskgroup.
+2025-04-10T00:01:50.962451+05:30
+Global Name changed to WIND
+Starting background process CJQ0
+2025-04-10T00:01:51.040366+05:30
+CJQ0 started with pid=52, OS id=30324_17192 
+Completed: alter database "Wind" open resetlogs
+alter database rename global_name to "Wind"
+Completed: alter database rename global_name to "Wind"
+TABLE AUDSYS.AUD$UNIFIED: ADDED INTERVAL PARTITION SYS_P261 (3936) VALUES LESS THAN (TIMESTAMP' 2025-04-10 00:00:00')
+ALTER TABLESPACE TEMP ADD TEMPFILE SIZE 20480K AUTOEXTEND ON NEXT 640K MAXSIZE UNLIMITED
+Completed: ALTER TABLESPACE TEMP ADD TEMPFILE SIZE 20480K AUTOEXTEND ON NEXT 640K MAXSIZE UNLIMITED
+ALTER DATABASE DEFAULT TABLESPACE "USERS"
+Completed: ALTER DATABASE DEFAULT TABLESPACE "USERS"
