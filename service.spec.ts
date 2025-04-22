@@ -92,23 +92,41 @@ public class PartVersionDiscussionTable extends AbstractComponentBuilder {
                 if (versioned instanceof WTPart) {
                     WTPart versionPart = (WTPart) versioned;
 
+                    // Retrieve the version ID for the part version
+                    String versionId = versionPart.getVersionInfo().getVersionId(); // Fetching Version ID
+
                     // Retrieve the topic and discussion for this part version using Windchill's existing relationships
-                    String topic = "Topic for version " + versionPart.getDisplayIdentifier();  // Use actual method to get topic
-                    String discussion = "Discussion for version " + versionPart.getDisplayIdentifier();  // Use actual method to get discussion
+                    String topic = getTopicFromVersion(versionPart);  // Get the actual topic based on part version
+                    String discussion = getDiscussionFromVersion(versionPart);  // Get the actual discussion for the part version
 
                     // Add the version, topic, and discussion to the list
-                    listobj.add(new Object[]{versionPart.getDisplayIdentifier(), topic, discussion});
+                    listobj.add(new Object[]{versionPart.getDisplayIdentifier(), versionId, topic, discussion});
                     LOGGER.debug("Fetched version: " + versionPart.getDisplayIdentifier());
                 }
             }
         } else {
             LOGGER.debug("Request object is not a WTPart.");
         }
-
+     
         // Log the final number of versions fetched
         LOGGER.debug("Total versions and discussions fetched: " + listobj.size());
 
         // Return the list of versions, topics, and discussions as the data for the table
         return listobj;
+    }
+
+   // String topic = getTopicFromRelatedObject(versionPart);
+//String discussion = getDiscussionFromRelatedObject(versionPart);
+
+    // Method to get the topic for a version (replace with actual logic to get topics)
+    private String getTopicFromVersion(WTPart versionPart) {
+        // Replace with actual logic to get the topic associated with the part version
+        return "Topic for version " + versionPart.getDisplayIdentifier();
+    }
+
+    // Method to get the discussion for a version (replace with actual logic to get discussions)
+    private String getDiscussionFromVersion(WTPart versionPart) {
+        // Replace with actual logic to get the discussion associated with the part version
+        return "Discussion for version " + versionPart.getDisplayIdentifier();
     }
 }
