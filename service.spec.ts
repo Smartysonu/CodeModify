@@ -5,24 +5,15 @@ import com.ptc.mvc.components.*;
 import com.ptc.netmarkets.util.beans.NmCommandBean;
 import com.ptc.netmarkets.util.beans.NmHelperBean;
 import static com.ptc.core.components.descriptor.DescriptorConstants.ColumnIdentifiers.ICON;
-import ext.cummins.part.CumminsPartConstantIF;
-import ext.cummins.utils.CumminsUtils;
-import wt.associativity.WTAssociativityHelper;
 import wt.fc.Persistable;
-import wt.fc.PersistenceHelper;
 import wt.fc.QueryResult;
 import wt.fc.WTObject;
-import wt.inf.container.WTContainer;
 import wt.log4j.LogManager;
 import wt.log4j.Logger;
 import wt.part.WTPart;
-import wt.query.QuerySpec;
-import wt.query.SearchCondition;
 import wt.util.WTException;
 import wt.vc.VersionControlHelper;
 import wt.vc.Versioned;
-import wt.vc.config.LatestConfigSpec;
-import wt.vc.wip.WorkInProgressHelper;
 import wt.workflow.forum.DiscussionForum;
 import wt.workflow.forum.DiscussionTopic;
 import wt.workflow.forum.ForumHelper;
@@ -31,7 +22,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.Map;@ComponentBuilder("ext.cummins.part.mvc.builders.TestDiscussionTable")
+import java.util.Map;
+
+@ComponentBuilder("ext.cummins.part.mvc.builders.TestDiscussionTable")
 public class TestDiscussionTable extends AbstractComponentBuilder {
     private static final String CLASSNAME = TestDiscussionTable.class.getName();
     private static final Logger LOGGER = LogManager.getLogger(CLASSNAME);
@@ -79,6 +72,7 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
     public Object buildComponentData(ComponentConfig config, ComponentParams paramComponentParams) throws WTException, IOException {
         NmHelperBean nmHelperBean = ((JcaComponentParams) paramComponentParams).getHelperBean();
         NmCommandBean nmCommandBean = nmHelperBean.getNmCommandBean();
+
         // Get the primary object (WTPart)
         Persistable requestObj = nmCommandBean.getPrimaryOid().getWtRef().getObject();
         WTPart wtpart = null;
@@ -87,23 +81,40 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
         // Process only if the request object is a WTPart
         if (requestObj instanceof WTPart) {
             wtpart = (WTPart) requestObj;
+            LOGGER.debug("Request object is a WTPart: " + wtpart.getDisplayIdentifier());
+
+            // Fetch all versions of the WTPart using VersionControlHelper
             QueryResult versionQuery = VersionControlHelper.service.allVersionsOf(wtpart);
+
             // Fetch discussions related to the part
             Enumeration forums = ForumHelper.service.getForums(wtpart);
+
             while (forums.hasMoreElements()) {
                 DiscussionForum forum = (DiscussionForum) forums.nextElement();
                 Enumeration topics = ForumHelper.service.getTopics(forum);
+
                 while (topics.hasMoreElements()) {
                     DiscussionTopic topic = (DiscussionTopic) topics.nextElement();
                     Enumeration messages = ForumHelper.service.getPostings(topic);
                     int messageCount = 0; // Initialize a counter for messages
+
                     while (messages.hasMoreElements()) {
-                        //DiscussionMessage message = (DiscussionMessage) messages.nextElement();
+                        // Fetch the discussion message (you can retrieve more details here if needed)
                         Map<String, String> rowData = new HashMap<>();
-                      //  rowData.put(TYPE, wtpart.getTypeIdentifier().getTypename());
-                        rowData.put(VERSION, versionQuery.toString());
+                        // Add part version details
+                        if (versionQuery.hasMoreElements()) {
+                            Versioned versioned = (Versioned) versionQuery.nextElement();
+                            if (versioned instanceof WTPart) {
+                                WTPart versionPart = (WTPart) versioned;
+                                String versionId = versionPart.getVersionInfo().getVersionId(); // Fetch Version ID
+                                rowData.put(VERSION, versionId);
+                            }
+                        }
+
+                        // Add topic and discussion information
                         rowData.put(TOPIC, topic.getName());
-                        rowData.put(DISCUSSION, wtpart.getVersionIdentifier().getValue());
+                        rowData.put(DISCUSSION, "Discussion content goes here"); // Replace with actual discussion text if available
+
                         discussionData.add(rowData);
                         System.out.println("Fetched discussion: " + rowData);
 
@@ -112,10 +123,12 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
                             break;
                         }
                     }
+
                     if (messageCount >= 10) { // Break condition: stop after 10 messages
                         break;
                     }
                 }
+
                 if (discussionData.size() >= 10) { // Break condition: stop after 10 discussions
                     break;
                 }
@@ -131,7 +144,3 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
         return discussionData;
     }
 }
-
-
-
-
