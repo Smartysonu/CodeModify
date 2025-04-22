@@ -7,7 +7,6 @@ import com.ptc.netmarkets.util.beans.NmHelperBean;
 import static com.ptc.core.components.descriptor.DescriptorConstants.ColumnIdentifiers.ICON;
 import ext.cummins.part.CumminsPartConstantIF;
 import ext.cummins.utils.CumminsUtils;
-import wt.associativity.WTAssociativityHelper;
 import wt.fc.Persistable;
 import wt.fc.QueryResult;
 import wt.fc.WTObject;
@@ -15,28 +14,29 @@ import wt.log4j.LogManager;
 import wt.log4j.Logger;
 import wt.part.WTPart;
 import wt.util.WTException;
-import wt.vc.config.LatestConfigSpec;
+import wt.vc.VersionControlHelper;
+import wt.vc.Versioned;
 import java.io.IOException;
 import java.util.ArrayList;
 
-@ComponentBuilder("ext.cummins.part.mvc.builders.TestDiscussionTable")
-public class TestDiscussionTable extends AbstractComponentBuilder {
-    private static final String CLASSNAME = TestDiscussionTable.class.getName();
+@ComponentBuilder("ext.cummins.part.mvc.builders.PartVersionTable")
+public class PartVersionTable extends AbstractComponentBuilder {
+    private static final String CLASSNAME = PartVersionTable.class.getName();
     private static final Logger LOGGER = LogManager.getLogger(CLASSNAME);
     private static final String TYPE = "Type";
-    private static final String TOPICS = "Topics/Comments";
+    private static final String VERSION = "Version";
     private static final String COMMENTS = "Comments";
     private static final String VERSION_VIEW_DISPLAY_NAME = "Version";
 
     @Override
     public ComponentConfig buildComponentConfig(ComponentParams params) throws WTException {
-        LOGGER.debug("Enter >> TestDiscussionTable");
+        LOGGER.debug("Enter >> PartVersionTable");
         ComponentConfigFactory factory = getComponentConfigFactory();
 
         // Define the table
         TableConfig table = factory.newTableConfig();
-        table.setLabel("Discussion History");
-        table.setId("ext.cummins.part.mvc.builders.TestDiscussionTable");
+        table.setLabel("Part Versions");
+        table.setId("ext.cummins.part.mvc.builders.PartVersionTable");
         table.setSelectable(false);
         table.setShowCount(true);
         table.setActionModel("");
@@ -46,19 +46,15 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
         col1.setLabel(TYPE);
         table.addComponent(col1);
 
-        ColumnConfig col2 = factory.newColumnConfig(TOPICS, false);
-        col2.setLabel(TOPICS);
+        ColumnConfig col2 = factory.newColumnConfig(VERSION, true);
+        col2.setLabel(VERSION);
         table.addComponent(col2);
 
-        ColumnConfig col4 = factory.newColumnConfig("versionInfo.identifier.versionId", true);
-        col4.setLabel(VERSION_VIEW_DISPLAY_NAME);
-        table.addComponent(col4);
+        ColumnConfig col3 = factory.newColumnConfig(COMMENTS, true);
+        col3.setLabel(COMMENTS);
+        table.addComponent(col3);
 
-        ColumnConfig col5 = factory.newColumnConfig(COMMENTS, true);
-        col5.setLabel(COMMENTS);
-        table.addComponent(col5);
-
-        LOGGER.debug("End >> TestDiscussionTable");
+        LOGGER.debug("End >> PartVersionTable");
         return table;
     }
 
@@ -70,45 +66,40 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
         // Get the primary object (WTPart)
         Persistable requestObj = nmCommandBean.getPrimaryOid().getWtRef().getObject();
         WTPart wtpart = null;
-        ArrayList<WTObject> listobj = new ArrayList<>();
-        QueryResult result = new QueryResult();
+        ArrayList<WTPart> listobj = new ArrayList<>();
 
         // Process only if the request object is a WTPart
         if (requestObj instanceof WTPart) {
             wtpart = (WTPart) requestObj;
             LOGGER.debug("Request object is a WTPart: " + wtpart.getDisplayIdentifier());
 
-            // Find upstream equivalent parts
-            result = WTAssociativityHelper.service.findUpstreamEquivalent(wtpart);
+            // Fetch all versions of the WTPart using VersionControlHelper
+            QueryResult versionQuery = VersionControlHelper.service.allVersions(wtpart);
             
-            // Apply LatestConfigSpec processing if needed
-            LatestConfigSpec configSpec = new LatestConfigSpec();
-            result = configSpec.process(result);
-
-            // Log the size of the result set
-            LOGGER.debug("Size of the QueryResult: " + result.size());
-
-            // If no results, log the message
-            if (result.size() == 0) {
-                LOGGER.debug("No upstream equivalent parts found for part: " + wtpart.getDisplayIdentifier());
+            // Check if any versions are found
+            if (versionQuery.size() == 0) {
+                LOGGER.debug("No versions found for part: " + wtpart.getDisplayIdentifier());
             } else {
-                LOGGER.debug("Found " + result.size() + " upstream equivalent parts.");
+                LOGGER.debug("Found " + versionQuery.size() + " versions for part: " + wtpart.getDisplayIdentifier());
             }
 
-            // Iterate through the result to fetch parts
-            while (result.hasMoreElements()) {
-                WTPart upstreamwtpart = (WTPart) result.nextElement();
-                listobj.add(upstreamwtpart);
-                LOGGER.debug("Fetched part: " + upstreamwtpart.getDisplayIdentifier());
+            // Iterate through the result to fetch part versions
+            while (versionQuery.hasMoreElements()) {
+                Versioned versioned = (Versioned) versionQuery.nextElement();
+                if (versioned instanceof WTPart) {
+                    WTPart versionPart = (WTPart) versioned;
+                    listobj.add(versionPart);
+                    LOGGER.debug("Fetched version: " + versionPart.getDisplayIdentifier());
+                }
             }
         } else {
             LOGGER.debug("Request object is not a WTPart.");
         }
 
         // Log the final number of parts fetched
-        LOGGER.debug("Total parts fetched: " + listobj.size());
+        LOGGER.debug("Total versions fetched: " + listobj.size());
 
-        // Return the list of parts as the data for the table
+        // Return the list of versions as the data for the table
         return listobj;
     }
 }
