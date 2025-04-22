@@ -5,21 +5,35 @@ import com.ptc.mvc.components.*;
 import com.ptc.netmarkets.util.beans.NmCommandBean;
 import com.ptc.netmarkets.util.beans.NmHelperBean;
 import static com.ptc.core.components.descriptor.DescriptorConstants.ColumnIdentifiers.ICON;
+import ext.cummins.part.CumminsPartConstantIF;
+import ext.cummins.utils.CumminsUtils;
+import wt.associativity.WTAssociativityHelper;
 import wt.fc.Persistable;
+import wt.fc.PersistenceHelper;
 import wt.fc.QueryResult;
 import wt.fc.WTObject;
+import wt.inf.container.WTContainer;
 import wt.log4j.LogManager;
 import wt.log4j.Logger;
 import wt.part.WTPart;
+import wt.query.QuerySpec;
+import wt.query.SearchCondition;
 import wt.util.WTException;
 import wt.vc.VersionControlHelper;
 import wt.vc.Versioned;
+import wt.vc.config.LatestConfigSpec;
+import wt.vc.wip.WorkInProgressHelper;
+import wt.workflow.forum.DiscussionForum;
+import wt.workflow.forum.DiscussionTopic;
+import wt.workflow.forum.ForumHelper;
+
 import java.io.IOException;
 import java.util.ArrayList;
-
-@ComponentBuilder("ext.cummins.part.mvc.builders.PartVersionDiscussionTable")
-public class PartVersionDiscussionTable extends AbstractComponentBuilder {
-    private static final String CLASSNAME = PartVersionDiscussionTable.class.getName();
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Map;@ComponentBuilder("ext.cummins.part.mvc.builders.TestDiscussionTable")
+public class TestDiscussionTable extends AbstractComponentBuilder {
+    private static final String CLASSNAME = TestDiscussionTable.class.getName();
     private static final Logger LOGGER = LogManager.getLogger(CLASSNAME);
     private static final String TYPE = "Type";
     private static final String VERSION = "Version";
@@ -29,13 +43,13 @@ public class PartVersionDiscussionTable extends AbstractComponentBuilder {
 
     @Override
     public ComponentConfig buildComponentConfig(ComponentParams params) throws WTException {
-        LOGGER.debug("Enter >> PartVersionDiscussionTable");
+        LOGGER.debug("Enter >> TestDiscussionTable");
         ComponentConfigFactory factory = getComponentConfigFactory();
 
         // Define the table
         TableConfig table = factory.newTableConfig();
-        table.setLabel("Part Versions & Discussions");
-        table.setId("ext.cummins.part.mvc.builders.PartVersionDiscussionTable");
+        table.setLabel("Discussions History");
+        table.setId("ext.cummins.part.mvc.builders.TestDiscussionTable");
         table.setSelectable(false);
         table.setShowCount(true);
         table.setActionModel("");
@@ -57,7 +71,7 @@ public class PartVersionDiscussionTable extends AbstractComponentBuilder {
         col4.setLabel(DISCUSSION);
         table.addComponent(col4);
 
-        LOGGER.debug("End >> PartVersionDiscussionTable");
+        LOGGER.debug("End >> TestDiscussionTable");
         return table;
     }
 
@@ -65,68 +79,59 @@ public class PartVersionDiscussionTable extends AbstractComponentBuilder {
     public Object buildComponentData(ComponentConfig config, ComponentParams paramComponentParams) throws WTException, IOException {
         NmHelperBean nmHelperBean = ((JcaComponentParams) paramComponentParams).getHelperBean();
         NmCommandBean nmCommandBean = nmHelperBean.getNmCommandBean();
-
         // Get the primary object (WTPart)
         Persistable requestObj = nmCommandBean.getPrimaryOid().getWtRef().getObject();
         WTPart wtpart = null;
-        ArrayList<Object[]> listobj = new ArrayList<>();
+        ArrayList<Map<String, String>> discussionData = new ArrayList<>();
 
         // Process only if the request object is a WTPart
         if (requestObj instanceof WTPart) {
             wtpart = (WTPart) requestObj;
-            LOGGER.debug("Request object is a WTPart: " + wtpart.getDisplayIdentifier());
+            QueryResult versionQuery = VersionControlHelper.service.allVersionsOf(wtpart);
+            // Fetch discussions related to the part
+            Enumeration forums = ForumHelper.service.getForums(wtpart);
+            while (forums.hasMoreElements()) {
+                DiscussionForum forum = (DiscussionForum) forums.nextElement();
+                Enumeration topics = ForumHelper.service.getTopics(forum);
+                while (topics.hasMoreElements()) {
+                    DiscussionTopic topic = (DiscussionTopic) topics.nextElement();
+                    Enumeration messages = ForumHelper.service.getPostings(topic);
+                    int messageCount = 0; // Initialize a counter for messages
+                    while (messages.hasMoreElements()) {
+                        //DiscussionMessage message = (DiscussionMessage) messages.nextElement();
+                        Map<String, String> rowData = new HashMap<>();
+                      //  rowData.put(TYPE, wtpart.getTypeIdentifier().getTypename());
+                        rowData.put(VERSION, versionQuery.toString());
+                        rowData.put(TOPIC, topic.getName());
+                        rowData.put(DISCUSSION, wtpart.getVersionIdentifier().getValue());
+                        discussionData.add(rowData);
+                        System.out.println("Fetched discussion: " + rowData);
 
-            // Fetch all versions of the WTPart using VersionControlHelper
-            QueryResult versionQuery = VersionControlHelper.service.allVersions(wtpart);
-
-            // Check if any versions are found
-            if (versionQuery.size() == 0) {
-                LOGGER.debug("No versions found for part: " + wtpart.getDisplayIdentifier());
-            } else {
-                LOGGER.debug("Found " + versionQuery.size() + " versions for part: " + wtpart.getDisplayIdentifier());
-            }
-
-            // Iterate through the result to fetch part versions and associated discussions
-            while (versionQuery.hasMoreElements()) {
-                Versioned versioned = (Versioned) versionQuery.nextElement();
-                if (versioned instanceof WTPart) {
-                    WTPart versionPart = (WTPart) versioned;
-
-                    // Retrieve the version ID for the part version
-                    String versionId = versionPart.getVersionInfo().getVersionId(); // Fetching Version ID
-
-                    // Retrieve the topic and discussion for this part version using Windchill's existing relationships
-                    String topic = getTopicFromVersion(versionPart);  // Get the actual topic based on part version
-                    String discussion = getDiscussionFromVersion(versionPart);  // Get the actual discussion for the part version
-
-                    // Add the version, topic, and discussion to the list
-                    listobj.add(new Object[]{versionPart.getDisplayIdentifier(), versionId, topic, discussion});
-                    LOGGER.debug("Fetched version: " + versionPart.getDisplayIdentifier());
+                        messageCount++;
+                        if (messageCount >= 10) { // Break condition: stop after 10 messages
+                            break;
+                        }
+                    }
+                    if (messageCount >= 10) { // Break condition: stop after 10 messages
+                        break;
+                    }
+                }
+                if (discussionData.size() >= 10) { // Break condition: stop after 10 discussions
+                    break;
                 }
             }
         } else {
-            LOGGER.debug("Request object is not a WTPart.");
+            System.out.println("Request object is not a WTPart.");
         }
-     
-        // Log the final number of versions fetched
-        LOGGER.debug("Total versions and discussions fetched: " + listobj.size());
 
-        // Return the list of versions, topics, and discussions as the data for the table
-        return listobj;
-    }
+        // Log the final number of discussions fetched
+        System.out.println("Total discussions fetched: " + discussionData.size());
 
-   // String topic = getTopicFromRelatedObject(versionPart);
-//String discussion = getDiscussionFromRelatedObject(versionPart);
-
-    // Method to get the topic for a version (replace with actual logic to get topics)
-    private String getTopicFromVersion(WTPart versionPart) {
-        // Replace with actual logic to get the topic associated with the part version
-        return "Topic for version " + versionPart.getDisplayIdentifier();
-    }
-
-    // Method to get the discussion for a version (replace with actual logic to get discussions)
-    private String getDiscussionFromVersion(WTPart versionPart) {
-        // Replace with actual logic to get the discussion associated with the part version
-        return "Discussion for version " + versionPart.getDisplayIdentifier();
+        // Return the discussion data for the table
+        return discussionData;
     }
 }
+
+
+
+
