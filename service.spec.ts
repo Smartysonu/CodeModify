@@ -33,6 +33,7 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
         LOGGER.debug("Enter >> TestDiscussionTable");
         ComponentConfigFactory factory = getComponentConfigFactory();
 
+        // Define the table
         TableConfig table = factory.newTableConfig();
         table.setLabel("Discussion History");
         table.setId("ext.cummins.part.mvc.builders.TestDiscussionTable");
@@ -40,12 +41,7 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
         table.setShowCount(true);
         table.setActionModel("");
 
-        Object obj = params.getContextObject();
-        if (obj instanceof WTPart) {
-            WTPart part = (WTPart) obj;
-        }
-
-        // Add columns
+        // Set columns for the table
         ColumnConfig col1 = factory.newColumnConfig(ICON, true);
         col1.setLabel(TYPE);
         table.addComponent(col1);
@@ -71,19 +67,23 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
         NmHelperBean nmHelperBean = ((JcaComponentParams) paramComponentParams).getHelperBean();
         NmCommandBean nmCommandBean = nmHelperBean.getNmCommandBean();
 
+        // Get the primary object (WTPart)
         Persistable requestObj = nmCommandBean.getPrimaryOid().getWtRef().getObject();
         WTPart wtpart = null;
         ArrayList<WTObject> listobj = new ArrayList<>();
         QueryResult result = new QueryResult();
 
+        // Process only if the request object is a WTPart
         if (requestObj instanceof WTPart) {
             wtpart = (WTPart) requestObj;
             LOGGER.debug("Request object is a WTPart: " + wtpart.getDisplayIdentifier());
 
+            // Find upstream equivalents of the WTPart
             result = WTAssociativityHelper.service.findUpstreamEquivalent(wtpart);
             LatestConfigSpec configSpec = new LatestConfigSpec();
             result = configSpec.process(result);
 
+            // Iterate through the results and add the upstream parts to the list
             while (result.hasMoreElements()) {
                 WTPart upstreamwtpart = (WTPart) result.nextElement();
                 listobj.add(upstreamwtpart);
@@ -94,8 +94,8 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
         }
 
         LOGGER.debug("Total parts fetched: " + listobj.size());
+        
+        // Return the list of parts as the data for the table
         return listobj;
     }
-
-
 }
