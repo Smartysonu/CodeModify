@@ -78,12 +78,24 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
             wtpart = (WTPart) requestObj;
             LOGGER.debug("Request object is a WTPart: " + wtpart.getDisplayIdentifier());
 
-            // Find upstream equivalents of the WTPart
+            // Find upstream equivalent parts
             result = WTAssociativityHelper.service.findUpstreamEquivalent(wtpart);
+            
+            // Apply LatestConfigSpec processing if needed
             LatestConfigSpec configSpec = new LatestConfigSpec();
             result = configSpec.process(result);
 
-            // Iterate through the results and add the upstream parts to the list
+            // Log the size of the result set
+            LOGGER.debug("Size of the QueryResult: " + result.size());
+
+            // If no results, log the message
+            if (result.size() == 0) {
+                LOGGER.debug("No upstream equivalent parts found for part: " + wtpart.getDisplayIdentifier());
+            } else {
+                LOGGER.debug("Found " + result.size() + " upstream equivalent parts.");
+            }
+
+            // Iterate through the result to fetch parts
             while (result.hasMoreElements()) {
                 WTPart upstreamwtpart = (WTPart) result.nextElement();
                 listobj.add(upstreamwtpart);
@@ -93,8 +105,9 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
             LOGGER.debug("Request object is not a WTPart.");
         }
 
+        // Log the final number of parts fetched
         LOGGER.debug("Total parts fetched: " + listobj.size());
-        
+
         // Return the list of parts as the data for the table
         return listobj;
     }
