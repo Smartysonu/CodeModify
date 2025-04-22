@@ -100,12 +100,14 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
                 if (versioned instanceof WTPart) {
                     WTPart versionPart = (WTPart) versioned;
 
-                    // Add the version to the map (e.g., Version ID)
-                    Map<String, String> rowData = new HashMap<>();
-                    rowData.put(VERSION_VIEW_DISPLAY_NAME, versionPart.getVersionInfo().getVersionId()); // Fetching version ID
+                    // Correct way to get version info (version ID)
+                    String versionId = versionPart.getVersionInfo().getVersionId();  // Get version ID from VersionInfo
+                    LOGGER.debug("Version ID: " + versionId);
 
                     // Fetch discussion forums related to this part version
                     Enumeration forums = ForumHelper.service.getForums(versionPart);
+
+                    // For each forum, fetch topics and messages
                     while (forums.hasMoreElements()) {
                         DiscussionForum forum = (DiscussionForum) forums.nextElement();
                         Enumeration topics = ForumHelper.service.getTopics(forum);
@@ -118,11 +120,13 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
                             // Iterate through the messages in the topic
                             while (messages.hasMoreElements()) {
                                 // Fetch the discussion message (you can retrieve more details here if needed)
-                                rowData.put(TOPICS, topic.getName());
-                                rowData.put(COMMENTS, "Discussion content for " + topic.getName());  // Mockup: Replace with real message content
+                                Map<String, String> rowData = new HashMap<>();
+                                rowData.put(VERSION_VIEW_DISPLAY_NAME, versionId); // Adding version ID
+                                rowData.put(TOPICS, topic.getName());  // Topic name
+                                rowData.put(COMMENTS, "Discussion content for " + topic.getName());  // Mockup content, replace with actual message content
 
                                 // Add the data to the list for each version/topic combination
-                                discussionData.add(rowData); 
+                                discussionData.add(rowData);
                                 LOGGER.debug("Fetched discussion: " + rowData);
                             }
                         }
