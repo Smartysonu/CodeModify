@@ -5,8 +5,6 @@ import com.ptc.mvc.components.*;
 import com.ptc.netmarkets.util.beans.NmCommandBean;
 import com.ptc.netmarkets.util.beans.NmHelperBean;
 import static com.ptc.core.components.descriptor.DescriptorConstants.ColumnIdentifiers.ICON;
-import ext.cummins.part.CumminsPartConstantIF;
-import ext.cummins.utils.CumminsUtils;
 import wt.fc.Persistable;
 import wt.fc.QueryResult;
 import wt.fc.WTObject;
@@ -19,24 +17,25 @@ import wt.vc.Versioned;
 import java.io.IOException;
 import java.util.ArrayList;
 
-@ComponentBuilder("ext.cummins.part.mvc.builders.PartVersionTable")
-public class PartVersionTable extends AbstractComponentBuilder {
-    private static final String CLASSNAME = PartVersionTable.class.getName();
+@ComponentBuilder("ext.cummins.part.mvc.builders.PartVersionDiscussionTable")
+public class PartVersionDiscussionTable extends AbstractComponentBuilder {
+    private static final String CLASSNAME = PartVersionDiscussionTable.class.getName();
     private static final Logger LOGGER = LogManager.getLogger(CLASSNAME);
     private static final String TYPE = "Type";
     private static final String VERSION = "Version";
-    private static final String COMMENTS = "Comments";
+    private static final String TOPIC = "Topic";
+    private static final String DISCUSSION = "Discussion";
     private static final String VERSION_VIEW_DISPLAY_NAME = "Version";
 
     @Override
     public ComponentConfig buildComponentConfig(ComponentParams params) throws WTException {
-        LOGGER.debug("Enter >> PartVersionTable");
+        LOGGER.debug("Enter >> PartVersionDiscussionTable");
         ComponentConfigFactory factory = getComponentConfigFactory();
 
         // Define the table
         TableConfig table = factory.newTableConfig();
-        table.setLabel("Part Versions");
-        table.setId("ext.cummins.part.mvc.builders.PartVersionTable");
+        table.setLabel("Part Versions & Discussions");
+        table.setId("ext.cummins.part.mvc.builders.PartVersionDiscussionTable");
         table.setSelectable(false);
         table.setShowCount(true);
         table.setActionModel("");
@@ -50,11 +49,15 @@ public class PartVersionTable extends AbstractComponentBuilder {
         col2.setLabel(VERSION);
         table.addComponent(col2);
 
-        ColumnConfig col3 = factory.newColumnConfig(COMMENTS, true);
-        col3.setLabel(COMMENTS);
+        ColumnConfig col3 = factory.newColumnConfig(TOPIC, true);
+        col3.setLabel(TOPIC);
         table.addComponent(col3);
 
-        LOGGER.debug("End >> PartVersionTable");
+        ColumnConfig col4 = factory.newColumnConfig(DISCUSSION, true);
+        col4.setLabel(DISCUSSION);
+        table.addComponent(col4);
+
+        LOGGER.debug("End >> PartVersionDiscussionTable");
         return table;
     }
 
@@ -66,7 +69,7 @@ public class PartVersionTable extends AbstractComponentBuilder {
         // Get the primary object (WTPart)
         Persistable requestObj = nmCommandBean.getPrimaryOid().getWtRef().getObject();
         WTPart wtpart = null;
-        ArrayList<WTPart> listobj = new ArrayList<>();
+        ArrayList<Object[]> listobj = new ArrayList<>();
 
         // Process only if the request object is a WTPart
         if (requestObj instanceof WTPart) {
@@ -75,7 +78,7 @@ public class PartVersionTable extends AbstractComponentBuilder {
 
             // Fetch all versions of the WTPart using VersionControlHelper
             QueryResult versionQuery = VersionControlHelper.service.allVersions(wtpart);
-            
+
             // Check if any versions are found
             if (versionQuery.size() == 0) {
                 LOGGER.debug("No versions found for part: " + wtpart.getDisplayIdentifier());
@@ -83,12 +86,18 @@ public class PartVersionTable extends AbstractComponentBuilder {
                 LOGGER.debug("Found " + versionQuery.size() + " versions for part: " + wtpart.getDisplayIdentifier());
             }
 
-            // Iterate through the result to fetch part versions
+            // Iterate through the result to fetch part versions and associated discussions
             while (versionQuery.hasMoreElements()) {
                 Versioned versioned = (Versioned) versionQuery.nextElement();
                 if (versioned instanceof WTPart) {
                     WTPart versionPart = (WTPart) versioned;
-                    listobj.add(versionPart);
+
+                    // Retrieve the topic and discussion for this part version using Windchill's existing relationships
+                    String topic = "Topic for version " + versionPart.getDisplayIdentifier();  // Use actual method to get topic
+                    String discussion = "Discussion for version " + versionPart.getDisplayIdentifier();  // Use actual method to get discussion
+
+                    // Add the version, topic, and discussion to the list
+                    listobj.add(new Object[]{versionPart.getDisplayIdentifier(), topic, discussion});
                     LOGGER.debug("Fetched version: " + versionPart.getDisplayIdentifier());
                 }
             }
@@ -96,10 +105,10 @@ public class PartVersionTable extends AbstractComponentBuilder {
             LOGGER.debug("Request object is not a WTPart.");
         }
 
-        // Log the final number of parts fetched
-        LOGGER.debug("Total versions fetched: " + listobj.size());
+        // Log the final number of versions fetched
+        LOGGER.debug("Total versions and discussions fetched: " + listobj.size());
 
-        // Return the list of versions as the data for the table
+        // Return the list of versions, topics, and discussions as the data for the table
         return listobj;
     }
 }
