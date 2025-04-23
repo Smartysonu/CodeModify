@@ -4,7 +4,16 @@ import com.ptc.jca.mvc.components.JcaComponentParams;
 import com.ptc.mvc.components.*;
 import com.ptc.netmarkets.util.beans.NmCommandBean;
 import com.ptc.netmarkets.util.beans.NmHelperBean;
+
 import static com.ptc.core.components.descriptor.DescriptorConstants.ColumnIdentifiers.ICON;
+import static ext.cummins.change.forms.processor.CumminsCNReviseFormProcessor.createPosting;
+import static ext.cummins.change.forms.processor.CumminsCNReviseFormProcessor.createTopic;
+
+import ext.cummins.change.forms.processor.CumminsCNReviseFormProcessor;
+import ext.cummins.part.CumminsPartConstantIF;
+import ext.cummins.utils.CumminsUtils;
+
+import wt.associativity.WTAssociativityHelper;
 import wt.fc.Persistable;
 import wt.fc.QueryResult;
 import wt.fc.WTObject;
@@ -15,21 +24,21 @@ import wt.util.WTException;
 import wt.vc.VersionControlHelper;
 import wt.vc.Versioned;
 import wt.workflow.forum.DiscussionForum;
+import wt.workflow.forum.DiscussionPosting;
 import wt.workflow.forum.DiscussionTopic;
 import wt.workflow.forum.ForumHelper;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
 
 @ComponentBuilder("ext.cummins.part.mvc.builders.TestDiscussionTable")
 public class TestDiscussionTable extends AbstractComponentBuilder {
+
     private static final String CLASSNAME = TestDiscussionTable.class.getName();
     private static final Logger LOGGER = LogManager.getLogger(CLASSNAME);
+
     private static final String TYPE = "Type";
-    private static final String VERSION = "Version";
     private static final String TOPICS = "Topics/Comments";
     private static final String COMMENTS = "Comments";
     private static final String VERSION_VIEW_DISPLAY_NAME = "Version";
@@ -37,9 +46,8 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
     @Override
     public ComponentConfig buildComponentConfig(ComponentParams params) throws WTException {
         LOGGER.debug("Enter >> TestDiscussionTable");
-        ComponentConfigFactory factory = getComponentConfigFactory();
 
-        // Define the table
+        ComponentConfigFactory factory = getComponentConfigFactory();
         TableConfig table = factory.newTableConfig();
         table.setLabel("Discussion History");
         table.setId("ext.cummins.part.mvc.builders.TestDiscussionTable");
@@ -47,22 +55,22 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
         table.setShowCount(true);
         table.setActionModel("");
 
-        // Set columns for the table
+        // Add columns
         ColumnConfig col1 = factory.newColumnConfig(ICON, true);
         col1.setLabel(TYPE);
         table.addComponent(col1);
 
-        ColumnConfig col2 = factory.newColumnConfig(VERSION, true);
-        col2.setLabel(VERSION);
+        ColumnConfig col2 = factory.newColumnConfig(TOPICS, false);
+        col2.setLabel(TOPICS);
         table.addComponent(col2);
 
-        ColumnConfig col3 = factory.newColumnConfig(TOPICS, true);
-        col3.setLabel(TOPICS);
-        table.addComponent(col3);
-
-        ColumnConfig col4 = factory.newColumnConfig(COMMENTS, true);
-        col4.setLabel(COMMENTS);
+        ColumnConfig col4 = factory.newColumnConfig("versionInfo.identifier.versionId", true);
+        col4.setLabel(VERSION_VIEW_DISPLAY_NAME);
         table.addComponent(col4);
+
+        ColumnConfig col5 = factory.newColumnConfig(COMMENTS, true);
+        col5.setLabel(COMMENTS);
+        table.addComponent(col5);
 
         LOGGER.debug("End >> TestDiscussionTable");
         return table;
@@ -73,75 +81,64 @@ public class TestDiscussionTable extends AbstractComponentBuilder {
         NmHelperBean nmHelperBean = ((JcaComponentParams) paramComponentParams).getHelperBean();
         NmCommandBean nmCommandBean = nmHelperBean.getNmCommandBean();
 
-        // Get the primary object (WTPart)
         Persistable requestObj = nmCommandBean.getPrimaryOid().getWtRef().getObject();
         WTPart wtpart = null;
-        ArrayList<Map<String, String>> discussionData = new ArrayList<>();
+        ArrayList<WTPart> listobj = new ArrayList<>();
 
-        // Process only if the request object is a WTPart
         if (requestObj instanceof WTPart) {
             wtpart = (WTPart) requestObj;
+           System.out.println("Request object is a WTPart: " + wtpart.getDisplayIdentifier());
 
-            LOGGER.debug("Request object is a WTPart: " + wtpart.getDisplayIdentifier());
-
-            // Fetch all versions of the WTPart using VersionControlHelper
             QueryResult versionQuery = VersionControlHelper.service.allVersionsOf(wtpart);
+            Enumeration<?> forums = ForumHelper.service.getForums(wtpart);
 
-            // Check if any versions are found
-            if (versionQuery.size() == 0) {
-                LOGGER.debug("No versions found for part: " + wtpart.getDisplayIdentifier());
-            } else {
-                LOGGER.debug("Found " + versionQuery.size() + " versions for part: " + wtpart.getDisplayIdentifier());
+            if (forums.hasMoreElements()) {
+                DiscussionForum forum = (DiscussionForum) forums.nextElement();
+                try {
+                    DiscussionForum newDiscussionForum = ForumHelper.service.createForum(
+                            forum.getParent().getDefinition().getName(), forum.getName(), wtpart, null);
+
+                    System.out.println("Created new discussion forum: " + newDiscussionForum);
+
+                    Enumeration<?> topics = forum.getTopics();
+                    while (topics.hasMoreElements()) {
+                        DiscussionTopic topic = (DiscussionTopic) topics.nextElement();
+                        QueryResult postings = (QueryResult) topic.getPostings();
+
+                        System.out.println("Processing topic: " + topic.getName());
+
+                        DiscussionTopic newDiscussionTopic = createTopic(newDiscussionForum, topic);
+                        System.out.println("Created new discussion topic: " + newDiscussionTopic);
+
+                        while (postings.hasMoreElements()) {
+                            DiscussionPosting posting = (DiscussionPosting) postings.nextElement();
+                            createPosting(wtpart, newDiscussionTopic, posting);
+                        }
+                    }
+                } catch (WTException e) {
+                    LOGGER.error("Error processing forum for part: " + wtpart.getDisplayIdentity(), e);
+                }
             }
 
-            // Single while loop to process versions and their associated forums, topics, and comments
+            if (versionQuery.size() == 0) {
+                System.out.println("No versions found for part: " + wtpart.getDisplayIdentifier());
+            } else {
+                System.out.println("Found " + versionQuery.size() + " versions for part: " + wtpart.getDisplayIdentifier());
+            }
+
             while (versionQuery.hasMoreElements()) {
                 Versioned versioned = (Versioned) versionQuery.nextElement();
                 if (versioned instanceof WTPart) {
                     WTPart versionPart = (WTPart) versioned;
-
-                    // Correctly fetching the version using getVersionIdentifier()
-                    String versionId = versionPart.getVersionIdentifier().getValue();  // Fetching version ID
-                    LOGGER.debug("Version ID: " + versionId);
-
-                    // Fetch discussion forums related to this part version
-                    Enumeration forums = ForumHelper.service.getForums(versionPart);
-
-                    // For each forum, fetch topics and messages
-                    while (forums.hasMoreElements()) {
-                        DiscussionForum forum = (DiscussionForum) forums.nextElement();
-                        Enumeration topics = ForumHelper.service.getTopics(forum);
-
-                        // Iterate through each topic and add to discussionData
-                        while (topics.hasMoreElements()) {
-                            DiscussionTopic topic = (DiscussionTopic) topics.nextElement();
-                            Enumeration messages = ForumHelper.service.getPostings(topic);
-
-                            // Collect the discussions for the topic and version
-                            while (messages.hasMoreElements()) {
-                                // Fetch the discussion message (you can retrieve more details here if needed)
-                                Map<String, String> rowData = new HashMap<>();
-                                rowData.put(VERSION_VIEW_DISPLAY_NAME, versionId);  // Adding version ID
-                                rowData.put(TOPICS, topic.getName());  // Topic name
-                                rowData.put(COMMENTS, "Discussion content for " + topic.getName());  // Mockup content, replace with actual message content
-
-                                // Add the data to the list for each version/topic combination
-                                discussionData.add(rowData);
-                                LOGGER.debug("Fetched discussion: " + rowData);
-                            }
-                        }
-                    }
-                    LOGGER.debug("Fetched version: " + versionPart.getDisplayIdentifier());
+                    listobj.add(versionPart);
+                    System.out.println("Fetched version: " + versionPart.getDisplayIdentifier());
                 }
             }
         } else {
-            LOGGER.debug("Request object is not a WTPart.");
+            System.out.println("Request object is not a WTPart.");
         }
 
-        // Log the final number of discussions fetched
-        LOGGER.debug("Total discussions fetched: " + discussionData.size());
-
-        // Return the discussion data for the table
-        return discussionData;
+        System.out.println("Total versions fetched: " + listobj.size());
+        return listobj;
     }
-}
+} //--->// how to add this discussion and version value ito table 
