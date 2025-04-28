@@ -1,69 +1,61 @@
-@Override
-public Object buildComponentData(ComponentConfig config, ComponentParams paramComponentParams) throws WTException, IOException {
-    NmHelperBean nmHelperBean = ((JcaComponentParams) paramComponentParams).getHelperBean();
-    NmCommandBean nmCommandBean = nmHelperBean.getNmCommandBean();
+package ext.cummins.part.dataUtilities;
 
-    Persistable requestObj = nmCommandBean.getPrimaryOid().getWtRef().getObject();
-    WTPart wtpart = null;
-    ArrayList<Map<String, String>> discussionData = new ArrayList<>();
+import com.ptc.core.components.descriptor.ModelContext;
+import com.ptc.core.components.factory.dataUtilities.DefaultDataUtility;
+import com.ptc.core.components.rendering.guicomponents.AttributeGuiComponent;
+import com.ptc.core.components.rendering.guicomponents.UrlDisplayComponent;
+import wt.fc.ObjectReference;
+import wt.fc.QueryResult;
+import wt.fc.ReferenceFactory;
+import wt.httpgw.GatewayServletHelper;
+import wt.httpgw.URLFactory;
+import wt.part.WTPart;
+import wt.util.WTException;
+import wt.workflow.forum.DiscussionForum;
+import wt.workflow.forum.DiscussionTopic;
+import wt.workflow.forum.ForumHelper;
 
-    if (requestObj instanceof WTPart) {
-        wtpart = (WTPart) requestObj;
-        LOGGER.debug("Request object is a WTPart: " + wtpart.getDisplayIdentifier());
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
 
-        // Query to fetch all versions of the WTPart
-        QueryResult versionQuery = VersionControlHelper.service.allVersionsOf(wtpart);
+public class CumminsGetDiscussionDataUtility extends DefaultDataUtility  {
 
-        // Check if there are versions for the part
-        if (versionQuery.size() == 0) {
-            LOGGER.debug("No versions found for part: " + wtpart.getDisplayIdentifier());
-        } else {
-            LOGGER.debug("Found " + versionQuery.size() + " versions for part: " + wtpart.getDisplayIdentifier());
-        }
+    @Override
+    public Object getDataValue(String s, Object o, ModelContext modelContext) throws WTException {
+        System.out.println("s:"+s);
 
-        // Fetch forums associated with the part
-        Enumeration<?> forums = ForumHelper.service.getForums(wtpart);
 
-        // Iterate through the versions, forums, topics, and comments
-        while (versionQuery.hasMoreElements()) {
-            Versioned versioned = (Versioned) versionQuery.nextElement();
-            if (versioned instanceof WTPart) {
-                WTPart versionPart = (WTPart) versioned;
-                String versionId = versionPart.getVersionIdentifier().getValue();  // Get version ID
-                LOGGER.debug("Version ID: " + versionId);
 
-                // Iterate through forums for each version
-                while (forums.hasMoreElements()) {
-                    DiscussionForum forum = (DiscussionForum) forums.nextElement();
-                    Enumeration<?> topics = ForumHelper.service.getTopics(forum);
+        List<AttributeGuiComponent> topicList = new ArrayList<AttributeGuiComponent>();
+        if(o instanceof WTPart){
+            WTPart part = (WTPart)o;
+            Enumeration<?> forums = ForumHelper.service.getForums(part);
+            if(forums.hasMoreElements()){
+                DiscussionForum  forum = (DiscussionForum) forums.nextElement();
+                Enumeration<?> topics = forum.getTopics();
+                while (topics.hasMoreElements()) {
+                    DiscussionTopic topic = (DiscussionTopic) topics.nextElement();
+                    UrlDisplayComponent urlDisplay = new UrlDisplayComponent(s, null, null, null);
 
-                    // Iterate through each topic and fetch the comments (postings)
-                    while (topics.hasMoreElements()) {
-                        DiscussionTopic topic = (DiscussionTopic) topics.nextElement();
-                        Enumeration<?> messages = ForumHelper.service.getPostings(topic);
+                    HashMap hashmap = new HashMap();
+                    hashmap.put("action", "ObjProps");
+                    ObjectReference objectreference = ObjectReference.newObjectReference(topic);
+                    ReferenceFactory referencefactory = new ReferenceFactory();
+                    hashmap.put("oid", referencefactory.getReferenceString(objectreference));
+                    URLFactory urlfactory = new wt.httpgw.URLFactory();
 
-                        // Collect the discussions for the topic and version
-                        while (messages.hasMoreElements()) {
-                            DiscussionPosting posting = (DiscussionPosting) messages.nextElement();
-
-                            // Prepare the data for the table row
-                            Map<String, String> rowData = new HashMap<>();
-                            rowData.put(VERSION_VIEW_DISPLAY_NAME, versionId);  // Add version ID
-                            rowData.put(TOPICS, topic.getName());  // Add topic name
-                            rowData.put(COMMENTS, posting.getText());  // Add the comment content (assuming getText is used)
-
-                            // Add the rowData to the list for each version/topic/posting
-                            discussionData.add(rowData);
-                            LOGGER.debug("Fetched discussion: " + rowData);
-                        }
-                    }
+                    String url= GatewayServletHelper.buildAuthenticatedHREF(urlfactory,"wt.enterprise.URLProcessor", "URLTemplateAction", null, hashmap);
+                    urlDisplay.setLink(url);
+                    urlDisplay.setLabel(topic.getName());
+                    urlDisplay.setName(topic.getName());
+                    urlDisplay.setLabelForTheLink(topic.getName());
+                    topicList.add(urlDisplay);
                 }
+
             }
         }
-    } else {
-        LOGGER.debug("Request object is not a WTPart.");
+        return topicList;
     }
-
-    LOGGER.debug("Total discussions fetched: " + discussionData.size());
-    return discussionData;
 }
