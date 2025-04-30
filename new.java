@@ -18,52 +18,68 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
-
-import static wt.index.IndexFieldNames.createTimestamp;
+import java.util.Map;
 
 public class CumminsGetDiscussionDataUtility extends DefaultDataUtility  {
 
     @Override
     public Object getDataValue(String s, Object o, ModelContext modelContext) throws WTException {
-        System.out.println("s:"+s);
-        List<AttributeGuiComponent> topicList = new ArrayList<AttributeGuiComponent>();
-        if(o instanceof WTPart){
-            WTPart part = (WTPart)o;
+        System.out.println("s:" + s);
+        List<Map<String, Object>> topicList = new ArrayList<>();
+        
+        if (o instanceof WTPart) {
+            WTPart part = (WTPart) o;
             Enumeration<?> forums = ForumHelper.service.getForums(part);
-            if(forums.hasMoreElements()){
-                DiscussionForum  forum = (DiscussionForum) forums.nextElement();
+            if (forums.hasMoreElements()) {
+                DiscussionForum forum = (DiscussionForum) forums.nextElement();
                 Enumeration<?> topics = forum.getTopics();
+                
                 while (topics.hasMoreElements()) {
                     DiscussionTopic topic = (DiscussionTopic) topics.nextElement();
+                    
+                    // Create a UrlDisplayComponent for each topic
                     UrlDisplayComponent urlDisplay = new UrlDisplayComponent(s, null, null, null);
-                    String createtimeStemp = String.valueOf(forum.getCreateTimestamp());
-                    String changrTimeStamp = String.valueOf(forum.getModifyTimestamp());
-                    String subj = String.valueOf(forum.getSubject());
-                    String modifyTimeStamp = String.valueOf(forum.getPersistInfo().getModifyStamp());
-                    System.out.println("createtimeStemp" + createtimeStemp);
-                    System.out.println("changrTimeStamp" + changrTimeStamp);
-                    System.out.println("subj" + subj);
-                    System.out.println("modifyTimeStamp" + modifyTimeStamp);
-                    HashMap hashmap = new HashMap();
-                    hashmap.put("action", "ObjProps");
-                    ObjectReference objectreference = ObjectReference.newObjectReference(topic);
-                    ReferenceFactory referencefactory = new ReferenceFactory();
-                    hashmap.put("oid", referencefactory.getReferenceString(objectreference));
-                    URLFactory urlfactory = new wt.httpgw.URLFactory();
+                    
+                    // Fetch necessary details like subject, message, and timestamps
+                    String createTimestamp = String.valueOf(forum.getCreateTimestamp());
+                    String changeTimestamp = String.valueOf(forum.getModifyTimestamp());
+                    String subject = String.valueOf(forum.getSubject());
+                    String modifyTimestamp = String.valueOf(forum.getPersistInfo().getModifyStamp());
 
-                    String url = GatewayServletHelper.buildAuthenticatedHREF(urlfactory, "wt.enterprise.URLProcessor", "URLTemplateAction", null, hashmap);
+                    System.out.println("createTimestamp: " + createTimestamp);
+                    System.out.println("changeTimestamp: " + changeTimestamp);
+                    System.out.println("subject: " + subject);
+                    System.out.println("modifyTimestamp: " + modifyTimestamp);
+
+                    // Prepare the URL
+                    HashMap<String, Object> hashmap = new HashMap<>();
+                    hashmap.put("action", "ObjProps");
+                    ObjectReference objectReference = ObjectReference.newObjectReference(topic);
+                    ReferenceFactory referenceFactory = new ReferenceFactory();
+                    hashmap.put("oid", referenceFactory.getReferenceString(objectReference));
+                    URLFactory urlFactory = new wt.httpgw.URLFactory();
+
+                    // Build the URL for the topic
+                    String url = GatewayServletHelper.buildAuthenticatedHREF(urlFactory, "wt.enterprise.URLProcessor", "URLTemplateAction", null, hashmap);
                     urlDisplay.setLink(url);
                     urlDisplay.setLabel(topic.getName());
                     urlDisplay.setName(topic.getName());
                     urlDisplay.setLabelForTheLink(topic.getName());
                     urlDisplay.setTarget("_blank");
-                    topicList.add(urlDisplay);
-                }
 
+                    // Create a Map to store the additional attributes
+                    Map<String, Object> topicData = new HashMap<>();
+                    topicData.put("urlDisplay", urlDisplay);
+                    topicData.put("subject", subject);
+                    topicData.put("message", String.valueOf(topic.getMessage()));  // Assuming getMessage() exists
+                    topicData.put("createdDate", createTimestamp);
+                    topicData.put("modificationDate", modifyTimestamp);
+
+                    // Add the topic data to the list
+                    topicList.add(topicData);
+                }
             }
         }
         return topicList;
     }
-
-
 }
