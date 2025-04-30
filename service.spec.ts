@@ -85,46 +85,71 @@ public class DiscussionHistoryTableBuilder extends AbstractComponentBuilder {
         return table;
     }
 
-    @Override
-    public Object buildComponentData(ComponentConfig config, ComponentParams paramComponentParams) throws WTException, IOException {
-        NmHelperBean nmHelperBean = ((JcaComponentParams) paramComponentParams).getHelperBean();
-        NmCommandBean nmCommandBean = nmHelperBean.getNmCommandBean();
+   @Override
+public Object buildComponentData(ComponentConfig config, ComponentParams paramComponentParams) throws WTException, IOException {
+    NmHelperBean nmHelperBean = ((JcaComponentParams) paramComponentParams).getHelperBean();
+    NmCommandBean nmCommandBean = nmHelperBean.getNmCommandBean();
 
-        Persistable requestObj = nmCommandBean.getPrimaryOid().getWtRef().getObject();
-        WTPart wtpart = null;
-        ArrayList<Object> listobj = new ArrayList<>();
-           
-        if (requestObj instanceof WTPart) {
-            wtpart = (WTPart) requestObj;
-            System.out.println("Request object is a WTPart: " + wtpart.getDisplayIdentifier());
+    Persistable requestObj = nmCommandBean.getPrimaryOid().getWtRef().getObject();
+    WTPart wtpart = null;
+    ArrayList<Object> listobj = new ArrayList<>();
+    
+    if (requestObj instanceof WTPart) {
+        wtpart = (WTPart) requestObj;
+        System.out.println("Request object is a WTPart: " + wtpart.getDisplayIdentifier());
 
-            QueryResult versionQuery = VersionControlHelper.service.allVersionsOf(wtpart);
-            if (versionQuery.size() == 0) {
-                System.out.println("No versions found for part: " + wtpart.getDisplayIdentifier());
-            } else {
-                System.out.println("Found " + versionQuery.size() + " versions for part: " + wtpart.getDisplayIdentifier());
-            }
+        // Query for all versions
+        QueryResult versionQuery = VersionControlHelper.service.allVersionsOf(wtpart);
+        if (versionQuery.size() == 0) {
+            System.out.println("No versions found for part: " + wtpart.getDisplayIdentifier());
+        } else {
+            System.out.println("Found " + versionQuery.size() + " versions for part: " + wtpart.getDisplayIdentifier());
+        }
 
-             Set<String> versionIdentifiers = new HashSet<>();
-            while (versionQuery.hasMoreElements()) {
-                Versioned versioned = (Versioned) versionQuery.nextElement();
-                if (versioned instanceof WTPart) {
-                    WTPart versionPart = (WTPart) versioned;
-                    String versionIdentifier = versionPart.getVersionIdentifier().getValue();
-                    System.out.println("versionIdentifier: " + versionIdentifier);
+        Set<String> versionIdentifiers = new HashSet<>();
+        while (versionQuery.hasMoreElements()) {
+            Versioned versioned = (Versioned) versionQuery.nextElement();
+            if (versioned instanceof WTPart) {
+                WTPart versionPart = (WTPart) versioned;
+                String versionIdentifier = versionPart.getVersionIdentifier().getValue();
+                System.out.println("versionIdentifier: " + versionIdentifier);
+
+                // Fetch the URL using CumminsGetDiscussionDataUtility
+                CumminsGetDiscussionDataUtility discussionUtility = new CumminsGetDiscussionDataUtility();
+                List<AttributeGuiComponent> topicList = (List<AttributeGuiComponent>) discussionUtility.getDataValue("col5", versionPart, null);
+
+                // Check if there are any topics with URLs
+                boolean hasValidUrl = false;
+                for (AttributeGuiComponent component : topicList) {
+                    if (component instanceof UrlDisplayComponent) {
+                        UrlDisplayComponent urlDisplay = (UrlDisplayComponent) component;
+                        String url = urlDisplay.getLink();  // Get the URL from the component
+                        if (url != null && !url.isEmpty()) {
+                            hasValidUrl = true;
+                            break;
+                        }
+                    }
+                }
+
+                // If col5 URL exists and is valid, add the version part to the list
+                if (hasValidUrl) {
                     if (!versionIdentifiers.add(versionIdentifier)) {
                         System.out.println("Duplicate version found: " + versionIdentifier);
                     } else {
                         listobj.add(versionPart);
                         System.out.println("Fetched version: " + versionPart.getDisplayIdentifier());
                     }
+                } else {
+                    System.out.println("col5 URL is empty or null for version: " + versionIdentifier);
                 }
             }
-        } else {
-            LOGGER.debug("Request object is not a WTPart.");
         }
-
-        LOGGER.debug("Total elements fetched: " + listobj.size());
-        return listobj;
+    } else {
+        LOGGER.debug("Request object is not a WTPart.");
     }
+
+    LOGGER.debug("Total elements fetched: " + listobj.size());
+    return listobj;
+}
+
 }
