@@ -1,91 +1,55 @@
-package ext.cummins.part.mvc.builders;
+@Override
+public ComponentConfig buildComponentConfig(ComponentParams params) throws WTException {
+    LOGGER.debug("Enter >> DiscussionHistoryTableBuilder");
 
-import com.ptc.jca.mvc.components.JcaComponentParams;
-import com.ptc.mvc.components.*;
-import com.ptc.netmarkets.util.beans.NmCommandBean;
-import com.ptc.netmarkets.util.beans.NmHelperBean;
+    ComponentConfigFactory factory = getComponentConfigFactory();
+    TableConfig table = factory.newTableConfig();
+    table.setLabel("Discussion History");
+    table.setId("ext.cummins.part.mvc.builders.CumminsDiscussionHistoryTableBuilder");
+    table.setSelectable(true);
+    table.setShowCount(true);
+    table.setActionModel("unsubscribed forum without delete actions");
+    table.setShowCustomViewLink(false);
+    table.setHelpContext("");
+    table.setRowBasedObjectHandle(true);
+    table.setShowCustomViewLink(true);
 
-import static com.ptc.core.components.descriptor.DescriptorConstants.ColumnIdentifiers.ICON;
-import static ext.cummins.change.forms.processor.CumminsCNReviseFormProcessor.createPosting;
-import static ext.cummins.change.forms.processor.CumminsCNReviseFormProcessor.createTopic;
+    // Add existing columns
+    ColumnConfig col1 = factory.newColumnConfig(ICON, true);
+    col1.setLabel(TYPE);
+    table.addComponent(col1);
 
-import ext.cummins.change.forms.processor.CumminsCNReviseFormProcessor;
-import ext.cummins.part.CumminsPartConstantIF;
-import ext.cummins.utils.CumminsUtils;
+    ColumnConfig col2 = factory.newColumnConfig("versionInfo.identifier.versionId", true);
+    col2.setLabel(VERSION_VIEW_DISPLAY_NAME);
+    table.addComponent(col2);
 
-import wt.associativity.WTAssociativityHelper;
-import wt.fc.Persistable;
-import wt.fc.QueryResult;
-import wt.fc.WTObject;
-import org.apache.logging.log4j.*;
-import wt.part.WTPart;
-import wt.util.WTException;
-import wt.vc.VersionControlHelper;
-import wt.vc.Versioned;
-import wt.workflow.forum.DiscussionForum;
-import wt.workflow.forum.DiscussionPosting;
-import wt.workflow.forum.DiscussionTopic;
-import wt.workflow.forum.ForumHelper;
+    ColumnConfig col3 = factory.newColumnConfig("url", false);
+    col3.setDataUtilityId("getDiscussions");
+    col3.setLabel(TOPICS);
+    table.addComponent(col3);
 
-import java.util.Arrays;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Enumeration;
-import java.util.HashSet;
-import java.util.Set;
+    // Add new columns for subject, message, created date, modification date
+    ColumnConfig col4 = factory.newColumnConfig("subject", false);
+    col4.setLabel("Subject From Forum");
+    table.addComponent(col4);
 
-@ComponentBuilder("ext.cummins.part.mvc.builders.DiscussionHistoryTableBuilder")
-public class DiscussionHistoryTableBuilder extends AbstractComponentBuilder {
+    ColumnConfig col5 = factory.newColumnConfig("message", false);
+    col5.setLabel("Message");
+    table.addComponent(col5);
 
-    private static final String CLASSNAME = DiscussionHistoryTableBuilder.class.getName();
-    private static final Logger LOGGER = LogManager.getLogger(CLASSNAME);
+    ColumnConfig col6 = factory.newColumnConfig("createdDate", false);
+    col6.setLabel("Created Date");
+    table.addComponent(col6);
 
-    private static final String TYPE = "Type";
-    private static final String TOPICS = "Topics/Comments";
-    private static final String COMMENTS = "Comments";
-    private static final String VERSION_VIEW_DISPLAY_NAME = "Version";
-    private static String isDataUtilityIdPresent;
+    ColumnConfig col7 = factory.newColumnConfig("modificationDate", false);
+    col7.setLabel("Modification Date");
+    table.addComponent(col7);
 
-    @Override
-    public ComponentConfig buildComponentConfig(ComponentParams params) throws WTException {
-        LOGGER.debug("Enter >> DiscussionHistoryTableBuilder");
+    LOGGER.debug("End >> CumminsDiscussionHistoryTableBuilder");
+    return table;
+}
 
-        ComponentConfigFactory factory = getComponentConfigFactory();
-        TableConfig table = factory.newTableConfig();
-        table.setLabel("Discussion History");
-        table.setId("ext.cummins.part.mvc.builders.CumminsDiscussionHistoryTableBuilder");
-        table.setSelectable(true);
-        table.setShowCount(true);
-        table.setActionModel("unsubscribed forum with out delete actions");
-        table.setShowCustomViewLink(false);
-	table.setHelpContext("");
-	table.setRowBasedObjectHandle(true);
-        table.setShowCustomViewLink(true);
-
- 
-        // Add columns
-        ColumnConfig col1 = factory.newColumnConfig(ICON, true);
-        col1.setLabel(TYPE);
-        table.addComponent(col1);
-
-        ColumnConfig col3 = factory.newColumnConfig("versionInfo.identifier.versionId", true);
-        col3.setLabel(VERSION_VIEW_DISPLAY_NAME);
-        table.addComponent(col3);
-
-         
-
-        ColumnConfig col4 = factory.newColumnConfig("url", false);
-        col4.setDataUtilityId("getDiscussions");
-        col4.setLabel(TOPICS);
-        table.addComponent(col4);
-
-
-        LOGGER.debug("End >> CumminsDiscussionHistoryTableBuilder");
-        return table;
-    }
-
-   @Override
+@Override
 public Object buildComponentData(ComponentConfig config, ComponentParams paramComponentParams) throws WTException, IOException {
     NmHelperBean nmHelperBean = ((JcaComponentParams) paramComponentParams).getHelperBean();
     NmCommandBean nmCommandBean = nmHelperBean.getNmCommandBean();
@@ -114,20 +78,28 @@ public Object buildComponentData(ComponentConfig config, ComponentParams paramCo
                 String versionIdentifier = versionPart.getVersionIdentifier().getValue();
                 System.out.println("versionIdentifier: " + versionIdentifier);
 
-                // Fetch the URL using CumminsGetDiscussionDataUtility
+                // Fetch the URL and other details using CumminsGetDiscussionDataUtility
                 CumminsGetDiscussionDataUtility discussionUtility = new CumminsGetDiscussionDataUtility();
-                List<AttributeGuiComponent> topicList = (List<AttributeGuiComponent>) discussionUtility.getDataValue("col5", versionPart, null);
+                List<Map<String, Object>> topicList = (List<Map<String, Object>>) discussionUtility.getDataValue("col5", versionPart, null);
 
                 // Check if there are any topics with URLs
                 boolean hasValidUrl = false;
-                for (AttributeGuiComponent component : topicList) {
-                    if (component instanceof UrlDisplayComponent) {
-                        UrlDisplayComponent urlDisplay = (UrlDisplayComponent) component;
-                        String url = urlDisplay.getLink();  // Get the URL from the component
-                        if (url != null && !url.isEmpty()) {
-                            hasValidUrl = true;
-                            break;
-                        }
+                String subject = "";
+                String message = "";
+                String createdDate = "";
+                String modificationDate = "";
+
+                for (Map<String, Object> topicData : topicList) {
+                    UrlDisplayComponent urlDisplay = (UrlDisplayComponent) topicData.get("urlDisplay");
+                    String url = urlDisplay.getLink();  // Get the URL from the component
+                    subject = (String) topicData.get("subject");
+                    message = (String) topicData.get("message");
+                    createdDate = (String) topicData.get("createdDate");
+                    modificationDate = (String) topicData.get("modificationDate");
+
+                    if (url != null && !url.isEmpty()) {
+                        hasValidUrl = true;
+                        break;
                     }
                 }
 
@@ -136,7 +108,16 @@ public Object buildComponentData(ComponentConfig config, ComponentParams paramCo
                     if (!versionIdentifiers.add(versionIdentifier)) {
                         System.out.println("Duplicate version found: " + versionIdentifier);
                     } else {
-                        listobj.add(versionPart);
+                        // Add the relevant details to the list for the row
+                        HashMap<String, Object> row = new HashMap<>();
+                        row.put("versionInfo.identifier.versionId", versionIdentifier);
+                        row.put("url", message);  // Using message as the URL value
+                        row.put("subject", subject);  // Subject from forum
+                        row.put("message", message);  // Message
+                        row.put("createdDate", createdDate);  // Created Date
+                        row.put("modificationDate", modificationDate);  // Modification Date
+
+                        listobj.add(row);
                         System.out.println("Fetched version: " + versionPart.getDisplayIdentifier());
                     }
                 } else {
@@ -150,6 +131,4 @@ public Object buildComponentData(ComponentConfig config, ComponentParams paramCo
 
     LOGGER.debug("Total elements fetched: " + listobj.size());
     return listobj;
-}
-
 }
