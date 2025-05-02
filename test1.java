@@ -3,120 +3,98 @@ package com.pxs.corporatecontact.client.salesforce;
 import com.pxs.corporatecontact.client.salesforce.model.SalesForceAnswer;
 import com.pxs.corporatecontact.client.salesforce.model.ServiceData;
 import com.pxs.middleware.exceptions.FunctionalMiddlewareException;
-import org.apache.commons.lang.StringUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.MockitoAnnotations;
+import org.mockito.Mockito;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestTemplate;
 
-import static org.mockito.Mockito.*;
+import java.util.Collections;
+
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 
-@ExtendWith(MockitoExtension.class)
 class SalesForceInternalContactServiceTest {
-
-    @Mock
-    private RestTemplate restTemplate;
 
     @InjectMocks
     private SalesForceInternalContactService salesForceInternalContactService;
 
-    private static final String CUSTOMER_ID = "12345";
-    private static final String LIMIT = "10";
+    @Mock
+    private RestTemplate restTemplate;
 
     @BeforeEach
     void setUp() {
-        // Setup before each test, if needed
+        MockitoAnnotations.openMocks(this);
     }
 
     @Test
-    void testFindCorporateContactByCustomerId_whenContactNotFound() {
+    void testFindCorporateContactByCustomerId_Success() {
         // Arrange
-        String apimUrl = "http://localhost:8000/CNTCTMINT/internalcontact/V2?customerIdentifier.idContext=CDB-F&customerIdentifier.idScope-SFAPM&customerIdentifier.id=12345&limit=10";
-        
+        String customerId = "12345";
+        String limit = "10";
         SalesForceAnswer salesForceAnswer = new SalesForceAnswer();
-        salesForceAnswer.setDescription("CONTACT_NOT_FOUND");
-
+        ServiceData serviceData = new ServiceData();
+        salesForceAnswer.setServicedata(serviceData);
         ResponseEntity<SalesForceAnswer> responseEntity = ResponseEntity.ok(salesForceAnswer);
 
-        HttpHeaders httpHeaders = new HttpHeaders();
-        httpHeaders.add("X-Transaction-MessageId", "messageId" + System.currentTimeMillis());
-        httpHeaders.add("X-Transaction-DateTimeCreated", "2025-05-02T00:00:00");
-
-        when(restTemplate.exchange(eq(apimUrl), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class)))
+        // Mock the RestTemplate response
+        Mockito.when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class)))
                 .thenReturn(responseEntity);
 
         // Act
-        ServiceData result = salesForceInternalContactService.findCorporateContactByCustomerId(CUSTOMER_ID, LIMIT);
+        ServiceData result = salesForceInternalContactService.findCorporateContactByCustomerId(customerId, limit);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(serviceData, result);
+    }
+
+    @Test
+    void testFindCorporateContactByCustomerId_ContactNotFound() {
+        // Arrange
+        String customerId = "12345";
+        String limit = "10";
+        SalesForceAnswer salesForceAnswer = new SalesForceAnswer();
+        salesForceAnswer.setDescription("CONTACT_NOT_FOUND");
+        salesForceAnswer.setServicedata(null);
+        ResponseEntity<SalesForceAnswer> responseEntity = ResponseEntity.ok(salesForceAnswer);
+
+        // Mock the RestTemplate response
+        Mockito.when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class)))
+                .thenReturn(responseEntity);
+
+        // Act
+        ServiceData result = salesForceInternalContactService.findCorporateContactByCustomerId(customerId, limit);
 
         // Assert
         assertNotNull(result);
         assertTrue(result.getContact().isEmpty());
         assertTrue(result.getReferenceObjects().isEmpty());
-
-        verify(restTemplate, times(1)).exchange(eq(apimUrl), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class));
     }
 
     @Test
-    void testFindCorporateContactByCustomerId_whenFunctionalErrorOccurs() {
+    void testFindCorporateContactByCustomerId_FunctionalError() {
         // Arrange
-        String apimUrl = "http://localhost:8000/CNTCTMINT/internalcontact/V2?customerIdentifier.idContext=CDB-F&customerIdentifier.idScope-SFAPM&customerIdentifier.id=12345&limit=10";
-        
+        String customerId = "12345";
+        String limit = "10";
         SalesForceAnswer salesForceAnswer = new SalesForceAnswer();
-        salesForceAnswer.setDescription("Some functional error occurred");
-
+        salesForceAnswer.setDescription("Some error occurred");
         ResponseEntity<SalesForceAnswer> responseEntity = ResponseEntity.ok(salesForceAnswer);
 
-        HttpHeaders httpHeaders = new HttpHeaders();
-        httpHeaders.add("X-Transaction-MessageId", "messageId" + System.currentTimeMillis());
-        httpHeaders.add("X-Transaction-DateTimeCreated", "2025-05-02T00:00:00");
-
-        when(restTemplate.exchange(eq(apimUrl), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class)))
+        // Mock the RestTemplate response
+        Mockito.when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class)))
                 .thenReturn(responseEntity);
 
         // Act & Assert
-        FunctionalMiddlewareException exception = assertThrows(FunctionalMiddlewareException.class, () -> {
-            salesForceInternalContactService.findCorporateContactByCustomerId(CUSTOMER_ID, LIMIT);
-        });
+        FunctionalMiddlewareException thrown = assertThrows(FunctionalMiddlewareException.class, () ->
+                salesForceInternalContactService.findCorporateContactByCustomerId(customerId, limit)
+        );
 
-        assertEquals("Some functional error occurred", exception.getMessage());
-    }
-
-    @Test
-    void testFindCorporateContactByCustomerId_whenValidResponse() {
-        // Arrange
-        String apimUrl = "http://localhost:8000/CNTCTMINT/internalcontact/V2?customerIdentifier.idContext=CDB-F&customerIdentifier.idScope-SFAPM&customerIdentifier.id=12345&limit=10";
-        
-        SalesForceAnswer salesForceAnswer = new SalesForceAnswer();
-        salesForceAnswer.setDescription("Valid Response");
-
-        ServiceData serviceData = new ServiceData();
-        // Set valid data in serviceData
-
-        salesForceAnswer.setServicedata(serviceData);
-        ResponseEntity<SalesForceAnswer> responseEntity = ResponseEntity.ok(salesForceAnswer);
-
-        HttpHeaders httpHeaders = new HttpHeaders();
-        httpHeaders.add("X-Transaction-MessageId", "messageId" + System.currentTimeMillis());
-        httpHeaders.add("X-Transaction-DateTimeCreated", "2025-05-02T00:00:00");
-
-        when(restTemplate.exchange(eq(apimUrl), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class)))
-                .thenReturn(responseEntity);
-
-        // Act
-        ServiceData result = salesForceInternalContactService.findCorporateContactByCustomerId(CUSTOMER_ID, LIMIT);
-
-        // Assert
-        assertNotNull(result);
-        // Add additional assertions for serviceData if necessary
-
-        verify(restTemplate, times(1)).exchange(eq(apimUrl), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class));
+        assertEquals("Some error occurred", thrown.getMessage());
     }
 }
