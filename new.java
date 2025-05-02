@@ -22,64 +22,95 @@ import java.util.Map;
 
 public class CumminsGetDiscussionDataUtility extends DefaultDataUtility  {
 
-    @Override
-    public Object getDataValue(String s, Object o, ModelContext modelContext) throws WTException {
-        System.out.println("s:" + s);
-        List<Map<String, Object>> topicList = new ArrayList<>();
-        
-        if (o instanceof WTPart) {
-            WTPart part = (WTPart) o;
-            Enumeration<?> forums = ForumHelper.service.getForums(part);
-            if (forums.hasMoreElements()) {
-                DiscussionForum forum = (DiscussionForum) forums.nextElement();
-                Enumeration<?> topics = forum.getTopics();
-                
-                while (topics.hasMoreElements()) {
-                    DiscussionTopic topic = (DiscussionTopic) topics.nextElement();
-                    
-                    // Create a UrlDisplayComponent for each topic
+    
+
+@Override
+public Object getDataValue(String s, Object o, ModelContext modelContext) throws WTException {
+    System.out.println("s:" + s);
+    List<AttributeGuiComponent> topicList = new ArrayList<>();
+
+    if (o instanceof WTPart) {
+        WTPart part = (WTPart) o;
+        Enumeration<?> forums = ForumHelper.service.getForums(part);
+
+        if (forums.hasMoreElements()) {
+            DiscussionForum forum = (DiscussionForum) forums.nextElement();
+            Enumeration<?> topics = forum.getTopics();
+
+            while (topics.hasMoreElements()) {
+                DiscussionTopic topic = (DiscussionTopic) topics.nextElement();
+                Enumeration<?> postings = topic.getPostings();
+
+                while (postings.hasMoreElements()) {
+                    DiscussionPosting posting = (DiscussionPosting) postings.nextElement();
+
+                    // Extract required details
+                    String message = posting.getBody(); // Posting message
+                    Timestamp created = posting.getCreateTimestamp();
+                    Timestamp modified = posting.getModifyTimestamp();
+                    String modifiedBy = posting.getModifierFullName(); // or use getModifiedBy() if needed
+
+                    // Format string to show in column (can be enhanced with HTML or line breaks)
+                    String displayText = "Topic: " + topic.getName() +
+                            "\nMessage: " + message +
+                            "\nCreated: " + created +
+                            "\nModified: " + modified +
+                            "\nModified By: " + modifiedBy;
+
                     UrlDisplayComponent urlDisplay = new UrlDisplayComponent(s, null, null, null);
-                    
-                    // Fetch necessary details like subject, message, and timestamps
-                    String createTimestamp = String.valueOf(forum.getCreateTimestamp());
-                    String changeTimestamp = String.valueOf(forum.getModifyTimestamp());
-                    String subject = String.valueOf(forum.getSubject());
-                    String modifyTimestamp = String.valueOf(forum.getPersistInfo().getModifyStamp());
 
-                    System.out.println("createTimestamp: " + createTimestamp);
-                    System.out.println("changeTimestamp: " + changeTimestamp);
-                    System.out.println("subject: " + subject);
-                    System.out.println("modifyTimestamp: " + modifyTimestamp);
-
-                    // Prepare the URL
-                    HashMap<String, Object> hashmap = new HashMap<>();
+                    // Create link to topic
+                    HashMap<String, String> hashmap = new HashMap<>();
                     hashmap.put("action", "ObjProps");
-                    ObjectReference objectReference = ObjectReference.newObjectReference(topic);
-                    ReferenceFactory referenceFactory = new ReferenceFactory();
-                    hashmap.put("oid", referenceFactory.getReferenceString(objectReference));
-                    URLFactory urlFactory = new wt.httpgw.URLFactory();
+                    ObjectReference objectreference = ObjectReference.newObjectReference(topic);
+                    ReferenceFactory referencefactory = new ReferenceFactory();
+                    hashmap.put("oid", referencefactory.getReferenceString(objectreference));
+                    URLFactory urlfactory = new URLFactory();
+                    String url = GatewayServletHelper.buildAuthenticatedHREF(
+                            urlfactory,
+                            "wt.enterprise.URLProcessor",
+                            "URLTemplateAction",
+                            null,
+                            hashmap
+                    );
 
-                    // Build the URL for the topic
-                    String url = GatewayServletHelper.buildAuthenticatedHREF(urlFactory, "wt.enterprise.URLProcessor", "URLTemplateAction", null, hashmap);
                     urlDisplay.setLink(url);
                     urlDisplay.setLabel(topic.getName());
                     urlDisplay.setName(topic.getName());
-                    urlDisplay.setLabelForTheLink(topic.getName());
+                    urlDisplay.setLabelForTheLink(displayText);  // This will show the full content on hover
                     urlDisplay.setTarget("_blank");
 
-                    // Create a Map to store the additional attributes
-                    Map<String, Object> topicData = new HashMap<>();
-                    topicData.put("urlDisplay", urlDisplay);
-                    topicData.put("subject", subject);
-                    topicData.put("message", String.valueOf(topic.getMessage()));  // Assuming getMessage() exists
-                    topicData.put("createdDate", createTimestamp);
-                    topicData.put("modificationDate", modifyTimestamp);
-
-                    // Add the topic data to the list
-                    topicList.add(topicData);
+                    topicList.add(urlDisplay);
                 }
             }
         }
-        return topicList;
     }
+
+    return topicList;
+}}
+--> in this code we we are displayText  in urlDisplay, but i need to add field on column value like-->  ColumnConfig col3 = factory.newColumnConfig("url", false);
+        col3.setDataUtilityId("getDiscussions");
+        col3.setLabel("Discussion Link");
+        table.addComponent(col3);
+
+        ColumnConfig col4 = factory.newColumnConfig("subject", false);
+        col4.setDataUtilityId("getDiscussions");
+        col4.setLabel("Subject");
+        table.addComponent(col4);
+
+        ColumnConfig col5 = factory.newColumnConfig("message", false); // false = NOT multiple
+        col5.setLabel("Message");
+        col5.setDataUtilityId("getDiscussions");
+        table.addComponent(col5);
+
+        ColumnConfig col6 = factory.newColumnConfig("createdDate", false);
+        col6.setDataUtilityId("getDiscussions");
+        col6.setLabel("Created Date");
+        table.addComponent(col6);
+
+        ColumnConfig col7 = factory.newColumnConfig("modificationDate", false);
+        col7.setDataUtilityId("getDiscussions");
+        col7.setLabel("Modification Date");
+        table.addComponent(col7);
+		
 }
