@@ -1,0 +1,135 @@
+package com.pxs.corporatecontact.client.salesforce;
+
+import com.pxs.corporatecontact.client.salesforce.model.SalesForceAnswer;
+import com.pxs.corporatecontact.client.salesforce.model.ServiceData;
+import com.pxs.middleware.exceptions.FunctionalMiddlewareException;
+import org.apache.commons.lang.StringUtils;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.Collections;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+public class SalesForceInternalContactServiceTest {
+
+    @Mock
+    private RestTemplate restTemplate;
+
+    @InjectMocks
+    private SalesForceInternalContactService salesForceInternalContactService;
+
+    private String customerId;
+    private String limit;
+
+    @BeforeEach
+    void setUp() {
+        customerId = "12345";
+        limit = "10";
+    }
+
+    @Test
+    void testFindCorporateContactByCustomerId_Success() {
+        // Arrange
+        SalesForceAnswer salesForceAnswer = mock(SalesForceAnswer.class);
+        ServiceData serviceData = mock(ServiceData.class);
+        when(salesForceAnswer.getDescription()).thenReturn("Success");
+        when(salesForceAnswer.getServicedata()).thenReturn(serviceData);
+
+        ResponseEntity<SalesForceAnswer> responseEntity = ResponseEntity.ok(salesForceAnswer);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class)))
+                .thenReturn(responseEntity);
+
+        // Act
+        ServiceData result = salesForceInternalContactService.findCorporateContactByCustomerId(customerId, limit);
+
+        // Assert
+        assertNotNull(result);
+        verify(restTemplate).exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class));
+    }
+
+    @Test
+    void testFindCorporateContactByCustomerId_ContactNotFound() {
+        // Arrange
+        SalesForceAnswer salesForceAnswer = mock(SalesForceAnswer.class);
+        when(salesForceAnswer.getDescription()).thenReturn("CONTACT_NOT_FOUND");
+
+        ResponseEntity<SalesForceAnswer> responseEntity = ResponseEntity.ok(salesForceAnswer);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class)))
+                .thenReturn(responseEntity);
+
+        // Act
+        ServiceData result = salesForceInternalContactService.findCorporateContactByCustomerId(customerId, limit);
+
+        // Assert
+        assertNotNull(result);
+        assertTrue(result.getContact().isEmpty());
+        assertTrue(result.getReferenceObjects().isEmpty());
+    }
+
+    @Test
+    void testFindCorporateContactByCustomerId_FunctionalError() {
+        // Arrange
+        SalesForceAnswer salesForceAnswer = mock(SalesForceAnswer.class);
+        when(salesForceAnswer.getDescription()).thenReturn("Functional error occurred");
+
+        ResponseEntity<SalesForceAnswer> responseEntity = ResponseEntity.ok(salesForceAnswer);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class)))
+                .thenReturn(responseEntity);
+
+        // Act & Assert
+        FunctionalMiddlewareException exception = assertThrows(FunctionalMiddlewareException.class, () ->
+                salesForceInternalContactService.findCorporateContactByCustomerId(customerId, limit));
+        assertEquals("Functional error occurred", exception.getMessage());
+    }
+
+    @Test
+    void testFindCorporateContactByCustomerId_EmptyResponseBody() {
+        // Arrange
+        SalesForceAnswer salesForceAnswer = mock(SalesForceAnswer.class);
+        when(salesForceAnswer.getDescription()).thenReturn(null);
+
+        ResponseEntity<SalesForceAnswer> responseEntity = ResponseEntity.ok(salesForceAnswer);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class)))
+                .thenReturn(responseEntity);
+
+        // Act & Assert
+        FunctionalMiddlewareException exception = assertThrows(FunctionalMiddlewareException.class, () ->
+                salesForceInternalContactService.findCorporateContactByCustomerId(customerId, limit));
+        assertNotNull(exception.getMessage());
+    }
+
+    @Test
+    void testFindCorporateContactByCustomerId_HeaderValidation() {
+        // Arrange
+        SalesForceAnswer salesForceAnswer = mock(SalesForceAnswer.class);
+        when(salesForceAnswer.getDescription()).thenReturn("Success");
+        when(salesForceAnswer.getServicedata()).thenReturn(mock(ServiceData.class));
+
+        ResponseEntity<SalesForceAnswer> responseEntity = ResponseEntity.ok(salesForceAnswer);
+        when(restTemplate.exchange(anyString(), eq(HttpMethod.GET), any(HttpEntity.class), eq(SalesForceAnswer.class)))
+                .thenReturn(responseEntity);
+
+        // Act
+        salesForceInternalContactService.findCorporateContactByCustomerId(customerId, limit);
+
+        // Assert: Verify headers are correctly set
+        HttpHeaders httpHeaders = new HttpHeaders();
+        httpHeaders.add("X-Transaction-MessageId", "messageId" + System.currentTimeMillis());
+        httpHeaders.add("X-Transaction-DateTimeCreated", mock(String.class));
+
+        assertTrue(httpHeaders.containsKey("X-Transaction-MessageId"));
+        assertTrue(httpHeaders.containsKey("X-Transaction-DateTimeCreated"));
+    }
+}
