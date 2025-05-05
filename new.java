@@ -1,120 +1,148 @@
-@Override
-public ComponentConfig buildComponentConfig(ComponentParams params) throws WTException {
-    LOGGER.debug("Enter >> DiscussionHistoryTableBuilder");
+package ext.cummins.part.mvc.builders;
 
-    ComponentConfigFactory factory = getComponentConfigFactory();
-    TableConfig table = factory.newTableConfig();
-    table.setLabel("Discussion History");
-    table.setId("ext.cummins.part.mvc.builders.CumminsDiscussionHistoryTableBuilder");
-    table.setSelectable(true);
-    table.setShowCount(true);
-    table.setActionModel("unsubscribed forum without delete actions");
-    table.setShowCustomViewLink(false);
-    table.setHelpContext("");
-    table.setRowBasedObjectHandle(true);
-    table.setShowCustomViewLink(true);
+import com.ptc.jca.mvc.components.JcaComponentParams;
+import com.ptc.mvc.components.*;
+import com.ptc.netmarkets.util.beans.NmCommandBean;
+import com.ptc.netmarkets.util.beans.NmHelperBean;
 
-    // Add existing columns
-    ColumnConfig col1 = factory.newColumnConfig(ICON, true);
-    col1.setLabel(TYPE);
-    table.addComponent(col1);
+import static com.ptc.core.components.descriptor.DescriptorConstants.ColumnIdentifiers.ICON;
+import com.ptc.core.components.rendering.guicomponents.AttributeGuiComponent;
+import com.ptc.core.components.rendering.guicomponents.UrlDisplayComponent;
 
-    ColumnConfig col2 = factory.newColumnConfig("versionInfo.identifier.versionId", true);
-    col2.setLabel(VERSION_VIEW_DISPLAY_NAME);
-    table.addComponent(col2);
+import ext.cummins.part.dataUtilities.CumminsGetDiscussionDataUtility;
+import ext.cummins.part.CumminsPartConstantIF;
+import ext.cummins.utils.CumminsUtils;
 
-    // Discussion Link (col3)
-    ColumnConfig col3 = factory.newColumnConfig("url", false);  // Use this for URL display
-    col3.setDataUtilityId("getDiscussions");
-    col3.setLabel("Discussion Link");
-    table.addComponent(col3);
+import wt.associativity.WTAssociativityHelper;
+import wt.fc.Persistable;
+import wt.fc.QueryResult;
+import wt.fc.WTObject;
+import org.apache.logging.log4j.*;
+import wt.part.WTPart;
+import wt.util.WTException;
+import wt.vc.VersionControlHelper;
+import wt.vc.Versioned;
+import wt.workflow.forum.DiscussionForum;
+import wt.workflow.forum.DiscussionPosting;
+import wt.workflow.forum.DiscussionTopic;
+import wt.workflow.forum.ForumHelper;
+import java.util.*;
+import java.util.Arrays;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Set;
 
-    // Subject (col4)
-    ColumnConfig col4 = factory.newColumnConfig("subject", false);
-    col4.setDataUtilityId("getDiscussions");
-    col4.setLabel("Subject");
-    table.addComponent(col4);
+@ComponentBuilder("ext.cummins.part.mvc.builders.DiscussionHistoryTableBuilder")
+public class DiscussionHistoryTableBuilder extends AbstractComponentBuilder {
 
-    // Message (col5)
-    ColumnConfig col5 = factory.newColumnConfig("message", false); // Display message
-    col5.setDataUtilityId("getDiscussions");
-    col5.setLabel("Message");
-    table.addComponent(col5);
+ private static final String CLASSNAME = DiscussionHistoryTableBuilder.class.getName();
+ private static final Logger LOGGER = LogManager.getLogger(CLASSNAME);
 
-    // Created Date (col6)
-    ColumnConfig col6 = factory.newColumnConfig("createdDate", false);
-    col6.setDataUtilityId("getDiscussions");
-    col6.setLabel("Created Date");
-    table.addComponent(col6);
+ private static final String TYPE = "Type";
+ private static final String TOPICS = "Topics/Comments";
+ private static final String COMMENTS = "Comments";
+ private static final String VERSION_VIEW_DISPLAY_NAME = "Version";
+ private static String isDataUtilityIdPresent;
 
-    // Modification Date (col7)
-    ColumnConfig col7 = factory.newColumnConfig("modificationDate", false);
-    col7.setDataUtilityId("getDiscussions");
-    col7.setLabel("Modification Date");
-    table.addComponent(col7);
+ @Override
+ public ComponentConfig buildComponentConfig(ComponentParams params) throws WTException {
+ LOGGER.debug("Enter >> DiscussionHistoryTableBuilder");
 
-    LOGGER.debug("End >> CumminsDiscussionHistoryTableBuilder");
-    return table;
-}
+ ComponentConfigFactory factory = getComponentConfigFactory();
+ TableConfig table = factory.newTableConfig();
+ table.setLabel("Discussion History");
+ table.setId("ext.cummins.part.mvc.builders.CumminsDiscussionHistoryTableBuilder");
+ table.setSelectable(true);
+ table.setShowCount(true);
+ table.setActionModel("");
+ table.setShowCustomViewLink(false);
+ table.setHelpContext("");
+ table.setRowBasedObjectHandle(true);
+ table.setShowCustomViewLink(true);
 
-@Override
-public Object buildComponentData(ComponentConfig config, ComponentParams paramComponentParams) throws WTException, IOException {
-    NmHelperBean nmHelperBean = ((JcaComponentParams) paramComponentParams).getHelperBean();
-    NmCommandBean nmCommandBean = nmHelperBean.getNmCommandBean();
 
-    Persistable requestObj = nmCommandBean.getPrimaryOid().getWtRef().getObject();
-    WTPart wtpart = null;
-    ArrayList<Object> listobj = new ArrayList<>();
-    
-    if (requestObj instanceof WTPart) {
-        wtpart = (WTPart) requestObj;
-        System.out.println("Request object is a WTPart: " + wtpart.getDisplayIdentifier());
+ // Add columns
+ ColumnConfig col1 = factory.newColumnConfig(ICON, true);
+ col1.setLabel(TYPE);
+ table.addComponent(col1);
 
-        // Query for all versions
-        QueryResult versionQuery = VersionControlHelper.service.allVersionsOf(wtpart);
-        if (versionQuery.size() == 0) {
-            System.out.println("No versions found for part: " + wtpart.getDisplayIdentifier());
-        } else {
-            System.out.println("Found " + versionQuery.size() + " versions for part: " + wtpart.getDisplayIdentifier());
-        }
+ ColumnConfig col2 = factory.newColumnConfig("versionInfo.identifier.versionId", true);
+ col2.setLabel(VERSION_VIEW_DISPLAY_NAME);
+ table.addComponent(col2);
 
-        Set<String> versionIdentifiers = new HashSet<>();
-        while (versionQuery.hasMoreElements()) {
-            Versioned versioned = (Versioned) versionQuery.nextElement();
-            if (versioned instanceof WTPart) {
-                WTPart versionPart = (WTPart) versioned;
-                String versionIdentifier = versionPart.getVersionIdentifier().getValue();
-                System.out.println("versionIdentifier: " + versionIdentifier);
+ ColumnConfig col3 = factory.newColumnConfig("url", false);
+ col3.setDataUtilityId("getDiscussions");
+ col3.setLabel("Discussion");
+ table.addComponent(col3);
 
-                // Fetch the data from CumminsGetDiscussionDataUtility
-                CumminsGetDiscussionDataUtility discussionUtility = new CumminsGetDiscussionDataUtility();
-                List<List<String>> topicList = (List<List<String>>) discussionUtility.getDataValue("col5", versionPart, null);
+ ColumnConfig col4 = factory.newColumnConfig("subject", false);
+ col4.setDataUtilityId("getDiscussions");
+ col4.setLabel("Subject");
+ table.addComponent(col4);
 
-                // Process the data and add it to listobj
-                for (List<String> topicData : topicList) {
-                    String url = topicData.get(0);  // URL for Discussion Link
-                    String subject = topicData.get(1);  // Subject
-                    String message = topicData.get(2);  // Message
-                    String createdDate = topicData.get(3);  // Created Date
-                    String modificationDate = topicData.get(4);  // Modification Date
+ ColumnConfig col5 = factory.newColumnConfig("message", false); // false = NOT multiple
+ col5.setLabel("Message");
+ col5.setDataUtilityId("getDiscussions.message");
+ table.addComponent(col5);
 
-                    // Add data to row for this topic
-                    HashMap<String, Object> row = new HashMap<>();
-                    row.put("url", url);  // URL for Discussion Link
-                    row.put("subject", subject);  // Subject
-                    row.put("message", message);  // Message
-                    row.put("createdDate", createdDate);  // Created Date
-                    row.put("modificationDate", modificationDate);  // Modification Date
+ ColumnConfig col6 = factory.newColumnConfig("createdDate", false);
+ col6.setDataUtilityId("getDiscussions");
+ col6.setLabel("Created Date");
+ table.addComponent(col6);
 
-                    listobj.add(row);
-                    System.out.println("Fetched version: " + versionPart.getDisplayIdentifier());
-                }
-            }
-        }
-    } else {
-        LOGGER.debug("Request object is not a WTPart.");
-    }
+ ColumnConfig col7 = factory.newColumnConfig("modificationDate", false);
+ col7.setDataUtilityId("getDiscussions");
+ col7.setLabel("Modification Date");
+ table.addComponent(col7);
 
-    LOGGER.debug("Total elements fetched: " + listobj.size());
-    return listobj;
-}
+
+ LOGGER.debug("End >> CumminsDiscussionHistoryTableBuilder");
+ return table;
+ }
+ @Override
+ public Object buildComponentData(ComponentConfig config, ComponentParams paramComponentParams) throws WTException, IOException {
+ NmHelperBean nmHelperBean = ((JcaComponentParams) paramComponentParams).getHelperBean();
+ NmCommandBean nmCommandBean = nmHelperBean.getNmCommandBean();
+
+ Persistable requestObj = nmCommandBean.getPrimaryOid().getWtRef().getObject();
+ WTPart wtpart = null;
+ ArrayList listobj = new ArrayList<>();
+ 
+ if (requestObj instanceof WTPart) {
+ wtpart = (WTPart) requestObj;
+ System.out.println("Request object is a WTPart: " + wtpart.getDisplayIdentifier());
+
+ QueryResult versionQuery = VersionControlHelper.service.allVersionsOf(wtpart);
+ if (versionQuery.size() == 0) {
+ System.out.println("No versions found for part: " + wtpart.getDisplayIdentifier());
+ } else {
+ System.out.println("Found " + versionQuery.size() + " versions for part: " + wtpart.getDisplayIdentifier());
+ }
+
+ Set versionIdentifiers = new HashSet<>();
+ while (versionQuery.hasMoreElements()) {
+ Versioned versioned = (Versioned) versionQuery.nextElement();
+ if (versioned instanceof WTPart) {
+ WTPart versionPart = (WTPart) versioned;
+ String versionIdentifier = versionPart.getVersionIdentifier().getValue();
+ System.out.println("versionIdentifier: " + versionIdentifier);
+ 
+ if (!versionIdentifiers.add(versionIdentifier)) {
+ System.out.println("Duplicate version found: " + versionIdentifier);
+ } else {
+ listobj.add(versionPart);
+ System.out.println("Fetched version: " + versionPart.getDisplayIdentifier());
+ }
+ }
+ }
+ } else {
+ LOGGER.debug("Request object is not a WTPart.");
+ }
+
+ LOGGER.debug("Total elements fetched: " + listobj.size());
+ return listobj;
+ }
+ } 
