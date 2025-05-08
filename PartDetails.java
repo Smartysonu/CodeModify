@@ -841,4 +841,148 @@ public class CumminsItemNotePopulation implements RemoteAccess {
 		}
 		return retunMessage.toString();
 	}
+
+	public static String populateItemNote(WTPart targetPart) throws WTException {
+    long customST = 0;
+    if (PERF_ENABLE) {
+        customST = System.currentTimeMillis();
+        LOGGER_PERF.info("Custom-Code >> START-Time >> " + customST);
+    }
+
+    // Formating for Item Note starts
+    LOGGER.debug("CumminsItemNotePopulation.populateItemNote() >>"
+            + targetPart.getNumber());
+
+    LOGGER.debug("Enter >> populateItemNote()");
+
+    StringBuilder retunMessage = new StringBuilder();
+    StringBuilder itemNote = new StringBuilder();
+    List<String> template;
+    String primaryClassification = "";
+
+    if (WorkInProgressHelper.isCheckedOut(targetPart)) {
+        throw new WTException("The Part [" + targetPart.getNumber()
+                + "] is checked out");
+    }
+
+    // **New Logic: Check if part type is Option Part and status is Pending Obsolete**
+    String partType = targetPart.getType().getName(); // Retrieve part type
+    String partStatus = targetPart.getLifeCycleState().getName(); // Retrieve part lifecycle state
+
+    if ("Option Part".equalsIgnoreCase(partType) && "Pending Obsolete".equalsIgnoreCase(partStatus)) {
+        LOGGER.info("Skipping Item Note population for part " + targetPart.getNumber()
+                + " as it is an Option Part with Pending Obsolete status.");
+        return "Item Note population skipped for Option Part with Pending Obsolete status.";
+    }
+
+    try {
+        // Get all Attributes of Part
+        Map<String, String> partAttributeMap = CumminsIBAHelper
+                .getAllValue(targetPart);
+
+        // Fetch Primary Classification of Part
+        primaryClassification = partAttributeMap
+                .containsKey(CumminsPartConstantIF.PRIMARY_CLASSIFICATION) ? partAttributeMap
+                .get(CumminsPartConstantIF.PRIMARY_CLASSIFICATION)
+                : primaryClassification;
+
+        LOGGER.error("Test");
+
+        // Checking if Item Note Classification
+        if (primaryClassification
+                .contains(CumminsItemNoteConstantIF.NOTE_PREFIX)) {
+
+            // Read the Item Note Template
+            template = CumminsItemNoteUtils
+                    .getTemplate(primaryClassification);
+
+            LOGGER.error(template);
+
+            int lineCounter = 0;
+            if (!template.isEmpty()) {
+                for (String line : template) {
+                    try {
+                        lineCounter += 1;
+                        String[] split = line.split(SEPERATOR_HASH_REGEX);
+                        String prefix = split[0].trim();
+                        String noteLine;
+                        String value;
+                        String attribInternalName;
+
+                        // Start New Code
+
+                        switch (prefix) {
+
+                            // Other cases...
+
+                            default:
+                                LOGGER.debug("Invalid Prefix :" + prefix);
+                                break;
+                        }
+
+                    } catch (Exception e) {
+                        LOGGER.error("Exception reading Item Note Template");
+                        LOGGER.error(e);
+                        itemNote.append(NEW_LINE);
+                    }
+
+                }
+
+                LOGGER.debug("CumminsItemNotePopulation.populateItemNote() : "
+                        + targetPart.getNumber() + " >>\n" + itemNote);
+
+                if (itemNote.length() > 0 && itemNote.length() <= CumminsItemNoteConstantIF.NOTE_ATTRIBUTE_LIMIT) {
+                    // Populate the Note Attribute on Part
+                    String msg = CumminsItemNoteUtils.writeItemNote(
+                            targetPart, itemNote);
+                    retunMessage.append((msg != null) ? msg : "");
+                }
+            }
+        }
+        // Condition for Free Note
+        else {
+
+            int lineCounter = 1;
+            String value = CumminsItemNoteUtils
+                    .getFreeNoteText(partAttributeMap);
+            if (value != null) {
+
+                StringBuilder note = formatNote(value, lineCounter);
+                itemNote.append(note);
+            }
+
+            LOGGER.debug("CumminsItemNotePopulation.populateItemNote() : "
+                    + targetPart.getNumber() + " >>\n" + itemNote);
+
+            if (itemNote.length() > 0 && itemNote.length() <= CumminsItemNoteConstantIF.NOTE_ATTRIBUTE_LIMIT) {
+                // Populate the Note Attribute on Part
+
+                String msg = CumminsItemNoteUtils.writeItemNote(targetPart,
+                        itemNote);
+                retunMessage.append(msg);
+            }
+        }
+
+    } catch (WTException ex) {
+        LOGGER.error("Exception in Item Note Population : "
+                + targetPart.getNumber());
+        LOGGER.error(ex);
+
+    } catch (RemoteException e) {
+        LOGGER.error("Exception in fetching attributes from Part"
+                + targetPart.getNumber());
+        LOGGER.error(e);
+    }
+
+    LOGGER.debug("Exit >> populateItemNote()");
+
+    if (PERF_ENABLE) {
+        long customET = System.currentTimeMillis();
+        LOGGER_PERF.info("Custom-Code >> TOTAL-Time >> "
+                + (customET - customST));
+    }
+
+    return retunMessage.toString();
+}
+
 }
