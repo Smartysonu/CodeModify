@@ -1,0 +1,35 @@
+handleStepContent(data: string, step: Step): void {
+  if (data.includes('STA_ProgressBarData') || data.includes('STA_DatePickerData')) {
+    this.checkJsonResponse(data);
+    return;
+  }
+
+  this.createDynamicComponent(step, data);
+  this._loadStepScripts(data);
+
+  // ✅ Delay and bind Next button click handler
+  setTimeout(() => {
+    const nextBtn = document.querySelector('[data-trigger-next="true"]');
+
+    if (nextBtn) {
+      console.log('✅ Next button handler attached');
+
+      nextBtn.addEventListener('click', () => {
+        const selectedInput = document.querySelector('input[name="multiChoiceGroup"]:checked');
+        if (!selectedInput) {
+          console.warn('⚠️ No radio selected');
+          return;
+        }
+
+        const flowItem = selectedInput.closest('[data-flowmanager-item]');
+        if (!flowItem) {
+          console.warn('⚠️ No flowmanager container found');
+          return;
+        }
+
+        console.log('🚀 Triggering handleFlowItemClick manually');
+        this.handleFlowItemClick(flowItem)({ preventDefault: () => {} });
+      });
+    }
+  }, 200); // delay to ensure FTL content is rendered
+}
