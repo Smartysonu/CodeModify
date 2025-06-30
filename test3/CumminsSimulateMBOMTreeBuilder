@@ -1,0 +1,1483 @@
+/**
+ * ----------------------------------------------------------------------------
+ * Copyright (c) Tata Consultancy Services (TCS) or Cummins Inc.
+ * All Rights Reserved.
+ *
+ * Copying or reproduction without any prior written approval is prohibited.
+ *-----------------------------------------------------------------------------
+ */
+
+package ext.cummins.plant.mvc.builders.trees;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.ResourceBundle;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.json.JSONArray;
+import org.json.JSONException;
+
+import com.ptc.core.components.descriptor.DescriptorConstants.TableTreeProperties;
+import com.ptc.jca.mvc.components.JcaComponentParams;
+import com.ptc.jca.mvc.components.JcaTreeConfig;
+import com.ptc.mvc.components.AbstractComponentBuilder;
+import com.ptc.mvc.components.ColumnConfig;
+import com.ptc.mvc.components.ComponentBuilder;
+import com.ptc.mvc.components.ComponentConfig;
+import com.ptc.mvc.components.ComponentConfigFactory;
+import com.ptc.mvc.components.ComponentParams;
+import com.ptc.mvc.components.ComponentResultProcessor;
+import com.ptc.mvc.components.PropertyConfig;
+import com.ptc.mvc.components.TreeConfig;
+import com.ptc.mvc.components.TreeDataBuilderAsync;
+import com.ptc.mvc.components.TreeNode;
+import com.ptc.mvc.components.ds.DataSourceMode;
+import com.ptc.netmarkets.model.NmSimpleOid;
+import com.ptc.netmarkets.util.beans.NmCommandBean;
+import com.ptc.netmarkets.util.beans.NmHelperBean;
+import com.ptc.windchill.mpml.resource.MPMPlant;
+
+import ext.cummins.change.CumminsChangeResource;
+import ext.cummins.interfaces.utils.InterfaceConstant;
+import ext.cummins.lifecycle.CumminsState;
+import ext.cummins.lifecycle.CumminsTransition;
+import ext.cummins.mpml.builder.CumminsValidatePlantItems;
+import ext.cummins.mpml.services.GraphNode;
+import ext.cummins.mpml.util.CumminsBOMUtility;
+import ext.cummins.mpml.visitor.CumminsBOMItemListBean;
+import ext.cummins.mpml.visitor.CumminsBeanHelper;
+import ext.cummins.part.CumminsPartConstantIF;
+import ext.cummins.part.CumminsPartHelper;
+import ext.cummins.plant.CumminsPlantConstantIF;
+import ext.cummins.plant.CumminsPlantResource;
+import ext.cummins.plant.autombom.PropertiesReader;
+import ext.cummins.plant.form.CumminsExtendBOMFormProcessor;
+import ext.cummins.plant.form.CumminsNewExtendBOMFormProcessor;
+import ext.cummins.plant.util.CumminsPlantHelper;
+import ext.cummins.utils.CumminsIBAHelper;
+import ext.cummins.utils.CumminsUtils;
+import wt.change2.WTChangeActivity2;
+import wt.lifecycle.State;
+import wt.lifecycle.Transition;
+import wt.part.WTPart;
+import wt.session.SessionServerHelper;
+import wt.util.WTException;
+import wt.vc.VersionControlException;
+import wt.vc.VersionControlHelper;
+/**
+ * <b>Class:</b> CumminsExtendBOMTreeBuilder.java <br>
+ * <br>
+ * <b> Description:</b> <br>
+ * <br>
+ *
+ * @author Tata Consultancy Services (TCS) <br>
+ * <br>
+ */
+
+@ComponentBuilder(value = "ext.cummins.plant.mvc.builders.trees.CumminsSimulateMBOMTreeBuilder")
+public class CumminsSimulateMBOMTreeBuilder extends AbstractComponentBuilder implements TreeDataBuilderAsync {
+
+	/** The Constant CLASSNAME. */
+	private static final String CLASSNAME = CumminsSimulateMBOMTreeBuilder.class.getName();
+
+	/** The Constant LOGGER. */
+	private static final Logger LOGGER = LogManager.getLogger(CLASSNAME);
+
+	/** The Constant RESOURCE. */
+	private static final String RESOURCE = ext.cummins.plant.CumminsPlantResource.class.getName();
+	
+	/** The Constant RESOURCE. */
+	private static final String CHANGERESOURCE = ext.cummins.change.CumminsChangeResource.class.getName();
+
+	private PropertyConfig col6;
+
+	
+
+	@Override
+	public ComponentConfig buildComponentConfig(ComponentParams paramComponentParams) throws WTException {
+		
+		LOGGER.debug("Enter>>CumminsSimulateMBOMTreeBuilder class-->ComponentConfig buildComponentConfig method Initiated]");
+
+		
+		ResourceBundle plantRB = ResourceBundle.getBundle(RESOURCE);
+		ResourceBundle changeRB = ResourceBundle.getBundle(CHANGERESOURCE);
+		ComponentConfigFactory factory = getComponentConfigFactory();
+		// get an instance of TableConfig
+		TreeConfig treeResultingParts = factory.newTreeConfig();
+
+		
+		// General table properties
+		treeResultingParts.setId(CumminsPlantConstantIF.SIMULATE_MBOM);
+		treeResultingParts.setLabel(changeRB.getString(CumminsChangeResource.PRIVATE_CONSTANT_SIMULATE_BOM_TABLE));
+		treeResultingParts.setShowCount(true);
+		treeResultingParts.setSelectable(false);
+		treeResultingParts.setRowBasedObjectHandle(true);
+		treeResultingParts.setActionModel("SimulateMBOM");
+		((JcaTreeConfig) treeResultingParts).setDataSourceMode(DataSourceMode.ASYNCHRONOUS);
+		((JcaTreeConfig) treeResultingParts).setExpansionLevel(TableTreeProperties.FULL_EXPAND);
+		
+		//Adding to to expand data everytime
+        ((JcaTreeConfig) treeResultingParts).setUniqueKey(String.valueOf(ThreadLocalRandom.current().nextLong(1_000_000_000L, 10_000_000_000L)));
+        
+		
+		//Change Type		
+		ColumnConfig col1 = factory.newColumnConfig("typeOfChange", true);
+		col1.setLabel(plantRB.getString(CumminsPlantResource.TYPE_OF_CHANGE));
+		treeResultingParts.addComponent(col1);
+		
+		//Object Type
+		ColumnConfig col2 = factory.newColumnConfig("usedPartType", true);
+		col2.setLabel(plantRB.getString(CumminsPlantResource.TYPE));
+		col2.setDataUtilityId("PartTypeNewExtendBOMDataUtility");
+		treeResultingParts.addComponent(col2);
+		
+		//Part Number
+		ColumnConfig col3 = factory.newColumnConfig("usedPartNumber", false);
+		col3.setLabel(plantRB.getString(CumminsPlantResource.NUMBER));
+		col3.setAutoSize(true);
+		col3.setSortable(true);
+		treeResultingParts.addComponent(col3);
+		treeResultingParts.setNodeColumn("usedPartNumber");
+		
+		// name
+		ColumnConfig col4 = factory.newColumnConfig("usedPartName", true);
+		col4.setLabel(plantRB.getString(CumminsPlantResource.NAME));
+		treeResultingParts.addComponent(col4);
+				
+		//version
+	    ColumnConfig col5 = factory.newColumnConfig("usedPartVersion", true);
+	    col5.setLabel(plantRB.getString(CumminsPlantResource.VERSION));
+		treeResultingParts.addComponent(col5);
+		
+		//state
+		ColumnConfig col20 = factory.newColumnConfig("extBOMState", true);
+        col20.setLabel(plantRB.getString(CumminsPlantResource.EXT_STATE));
+        col20.setSortable(true);
+		treeResultingParts.addComponent(col20);
+		
+		//Quantity
+		ColumnConfig col6 = factory.newColumnConfig("extBOMquantity", true);
+		col6.setLabel(plantRB.getString(CumminsPlantResource.QUANTITY));
+		treeResultingParts.addComponent(col6);
+		
+		//Source
+		ColumnConfig col7 = factory.newColumnConfig("extBOMSource", true);
+		col7.setLabel(plantRB.getString(CumminsPlantResource.SOURCE));
+		treeResultingParts.addComponent(col7);
+
+		//Source
+		ColumnConfig col9 = factory.newColumnConfig("isRILAssembly", true);
+		col9.setLabel(plantRB.getString(CumminsPlantResource.IS_RIL_ASSEMBLY));
+		treeResultingParts.addComponent(col9);
+		
+		//Source
+		ColumnConfig col10 = factory.newColumnConfig("isRILPart", true);
+		col10.setLabel(plantRB.getString(CumminsPlantResource.IS_RIL_PART));
+		treeResultingParts.addComponent(col10);
+		
+		//Modified Stimulate
+		ColumnConfig col8 = factory.newColumnConfig("extError", true);
+		col8.setLabel(plantRB.getString(CumminsPlantResource.ERROR));
+		treeResultingParts.addComponent(col8);
+		
+		LOGGER.debug("End >> CumminsSimulateMBOMTreeBuilder");
+		return treeResultingParts;
+		
+
+	}
+
+	@Override
+	public Object buildComponentData(ComponentConfig paramComponentConfig, ComponentParams paramComponentParams) throws Exception {
+		return null;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public void buildNodeData(Object node, ComponentResultProcessor resultProcessor) throws Exception {
+		LOGGER.debug("buildNodeData Method Initiated");
+		NmHelperBean nmHelperBean = ((JcaComponentParams) resultProcessor.getParams())
+                .getHelperBean();
+		
+		boolean byPassAccess = SessionServerHelper.manager.isAccessEnforced();
+		try {
+			SessionServerHelper.manager.setAccessEnforced(false);
+	        NmCommandBean nmCommandBean = nmHelperBean.getNmCommandBean();
+	        WTChangeActivity2 ca = (WTChangeActivity2)nmCommandBean.getPrimaryOid().getRefObject();
+	        List<WTPart> resultigObjList = CumminsBOMUtility.getChangablesPartListFromCA(ca);	        
+	        List<NmSimpleOid> resultantPartsList = new ArrayList<NmSimpleOid>();
+	        LOGGER.debug("--------START --CumminsSimulateMBOMTreeBuilder----buildNodeData()...");
+			String containerName = nmCommandBean.getContainer().getName();
+			LOGGER.debug("containerName :" +containerName);
+			String viewName = PropertiesReader.getPropertyValue(containerName.replace(" ", "_")).replace(" ", "_");
+			LOGGER.debug("viewName :" +viewName);
+			String uiData=nmCommandBean.getTextParameter("exportList2");
+			LOGGER.debug("uiData :" +uiData);
+			List<GraphNode> rootnodes=new ArrayList<GraphNode>();
+			List<GraphNode> allNodes=new ArrayList<GraphNode>();
+			List<GraphNode> cumRilParts=new ArrayList<GraphNode>();
+			
+			Map<String, GraphNode> partsTOBeCreated = new HashMap<String, GraphNode>();
+			if(uiData!=null ) {
+				if (node == TreeNode.RootNode) {
+				ConcurrentHashMap<Object, Object> sessionStorage = nmCommandBean.getSessionBean().getStorage();
+				JSONArray jsonArray = new JSONArray(uiData);
+				MPMPlant plant = CumminsBOMUtility.getMPMPlant(viewName);
+				LOGGER.debug("plant Name :" +plant);
+
+				// Converting JSON Array to Graph
+				rootnodes = GraphNode.buildGraph(jsonArray, plant);
+				//Modified Stimulate
+				List<WTPart> errorWTParts = new ArrayList<WTPart>();
+				List<WTPart> errorDiffMCNParts = new ArrayList<WTPart>();
+				List<WTPart> errWTParts = new ArrayList<WTPart>();
+				List<WTPart> erroredWTParts = new ArrayList<WTPart>();
+				//updated the method to add container name for the Ext and Reconcile Validation
+				for(GraphNode root:rootnodes) {
+					allNodes.addAll(GraphNode.getAllNodes(root));
+				}
+				
+				List<GraphNode> rilParts=new ArrayList<GraphNode>();
+				LOGGER.info("Graph Root Nodes Created");
+				//rilAssemblyYes for interface related RIL Validation story. 
+				LOGGER.info("RIL Validation Start");
+				List<WTPart > rilAssmblyYesList=new ArrayList<WTPart>();
+				List<GraphNode> rilAssembly=new ArrayList<GraphNode>();
+					// Code to Add missed RIL component-Start
+				List<GraphNode> filteredBeans = allNodes.stream()
+			            .filter(bean -> ((bean.getRilAssemblyYes().equalsIgnoreCase("Yes") || bean.getIsRILPart().equalsIgnoreCase("Yes")) && !bean.getSourceattr().equals("None")))
+			            .collect(Collectors.toList());
+				LOGGER.info("RIL Total Parts Updated>>>"+filteredBeans.size());
+				for (GraphNode allNodeObjects : filteredBeans) {
+					LOGGER.info("allNodeObjects Objects"+allNodeObjects.getGraphPart().getNumber());
+					boolean createRILPart = false;
+					boolean createRILAssembly = false;
+					boolean isreviseorCreateNeeded=true;
+					boolean isRILCheckEnabled=checkIsRILPart(allNodeObjects.getGraphPart());
+
+					LOGGER.debug("isRILCheckEnabled:" +isRILCheckEnabled);
+					WTPart eqMfgPart = CumminsBeanHelper.getLatestDownstreamManufPart(allNodeObjects.getGraphPart(),
+							viewName);
+					LOGGER.debug("eqMfgPart getLatestDownstreamManufPart:" + eqMfgPart);
+                    LOGGER.debug("rilAssmbly before" + allNodeObjects.getRilAssemblyYes().equalsIgnoreCase("Yes"));
+					LOGGER.debug("Checking part: " + allNodeObjects.getGraphPart().getNumber());
+					LOGGER.debug("Is design part view: " + allNodeObjects.getGraphPart().getViewName());
+					LOGGER.debug("Expected downstream viewName: " + viewName);
+					LOGGER.debug("eqMfgPart returned: " + eqMfgPart);
+
+					eqMfgPart=CumminsNewExtendBOMFormProcessor.previousVersionLaunch(viewName,allNodeObjects.getGraphPart(),eqMfgPart);
+					LOGGER.debug("eqMfgPart CumminsNewExtendBOMFormProcessor:" + eqMfgPart);
+                    LOGGER.debug("eqMfgPart CumminsNewExtendBOMFormProcessor:" + eqMfgPart);
+					//1886 Extend / Reconcile shall not create RIL BOM structure for the Child Objects when it is getting removed from the Engineering
+					 if(allNodeObjects.getTypeOfChange().equalsIgnoreCase("Removed")){
+						 LOGGER.debug("getTypeOfChange is removed:");
+						 isreviseorCreateNeeded=false;
+					  }
+					if (eqMfgPart != null) {
+						LOGGER.debug("eqMfgPart viewName: " + eqMfgPart);
+						if (!allNodeObjects.getIsSourceUpdated().equalsIgnoreCase("True")) {
+							isreviseorCreateNeeded=false;
+						}
+					}
+					if (eqMfgPart != null) {
+					LOGGER.debug("eqMfgPart:" +eqMfgPart);
+					boolean isDelink = CumminsValidatePlantItems.isDelinkedPart(eqMfgPart);
+				    LOGGER.debug("isDelink:" +isDelink);
+					if (!allNodeObjects.getIsSourceUpdated().equalsIgnoreCase("True")) {
+						isreviseorCreateNeeded=false;
+					}
+					//1886 System shall restrict the creation of new revision of the Part if the Part (RIL Indicator = Yes) is already present in the DEP Plant and not //Delinked.
+					if (allNodeObjects.getRilAssemblyYes().equalsIgnoreCase("Yes") || (isRILCheckEnabled && !isDelink)){
+ 						LOGGER.debug("getRilAssemblyYes" +isreviseorCreateNeeded);
+
+						isreviseorCreateNeeded=false;
+					 }
+					}
+					 LOGGER.debug("isreviseorCreateNeeded in mfgPart:" +isreviseorCreateNeeded);
+
+					if(isreviseorCreateNeeded) {
+					if (allNodeObjects.getRilAssemblyYes().equalsIgnoreCase("Yes")) {
+						if (!rilAssmblyYesList.contains(allNodeObjects.getGraphPart())) {
+							createRILAssembly = CumminsNewExtendBOMFormProcessor.checkIfPartCreationNeeded(allNodeObjects);
+							if (createRILAssembly) {
+								rilAssmblyYesList.add(allNodeObjects.getGraphPart());
+								rilAssembly.add(allNodeObjects);
+							}
+						}
+					}
+					if (allNodeObjects.getIsRILPart().equalsIgnoreCase("Yes") && !createRILAssembly) {
+						LOGGER.info("getIsRILPart"+allNodeObjects.getIsRILPart());
+						createRILPart = CumminsNewExtendBOMFormProcessor.checkIfPartCreationNeeded(allNodeObjects);
+						if (!rilParts.contains(allNodeObjects)) {
+							if (createRILPart) {
+								rilParts.add(allNodeObjects);
+							}
+						}
+					}
+					}
+				}
+				LOGGER.info("RIL Assembly Parts>>>"+rilAssmblyYesList.size());
+				LOGGER.info("rilAssembly>>>"+rilAssembly.size());
+				LOGGER.info("rilParts>>>"+rilParts.size());
+					// Code to Add missed RIL component-End
+				List<GraphNode> levelZeroNodes=new ArrayList<GraphNode>();
+				levelZeroNodes = allNodes.stream().filter(bean -> bean.getIsSourceUpdated().equalsIgnoreCase("True")).collect(Collectors.toList());
+				errorWTParts = CumminsNewExtendBOMFormProcessor.createObjDuringExtension(levelZeroNodes, errorWTParts,viewName,nmCommandBean);
+				errorDiffMCNParts = CumminsNewExtendBOMFormProcessor.objDiffMCN(levelZeroNodes, errorDiffMCNParts,viewName,nmCommandBean);
+				errWTParts=CumminsNewExtendBOMFormProcessor.validateCheckedOutPart(levelZeroNodes, errWTParts,viewName,nmCommandBean);
+				erroredWTParts =CumminsNewExtendBOMFormProcessor.validateMfgPartAssWithMcn(levelZeroNodes, erroredWTParts,viewName,nmCommandBean);
+				if(errorWTParts.isEmpty() && errorDiffMCNParts.isEmpty() && errWTParts.isEmpty() && erroredWTParts.isEmpty()) {
+				for (GraphNode root : rootnodes) {
+					// To get leafNodes use below API
+					List<GraphNode> lastChilds = GraphNode.findLeafNodes(root);
+					for (GraphNode lastChild : lastChilds) {
+						LOGGER.debug("lastChild >>>"+lastChild);
+						LOGGER.debug("root >>>"+root);
+						LOGGER.debug("partsTOBeCreated >>>"+partsTOBeCreated);
+						LOGGER.debug("resultigObjList >>>"+resultigObjList);
+						createPartsBasedOnParent(lastChild, root, partsTOBeCreated,resultigObjList);
+					}
+					
+				}
+				cumRilParts.addAll(rilParts);
+				cumRilParts.addAll(rilAssembly);
+				cumRilParts.removeAll(partsTOBeCreated.values());
+				sessionStorage.put("rilComponent"+ca.getNumber(), cumRilParts);
+				LOGGER.debug("cumRilParts list >>>"+cumRilParts);
+				for(GraphNode eachGraphPart :cumRilParts) {
+					partsTOBeCreated.put(eachGraphPart.usedPartNumber,eachGraphPart);
+				}
+				if(partsTOBeCreated.size()>0) {
+					for (GraphNode eachGraphPart : partsTOBeCreated.values()) {
+						LOGGER.debug("Simulate Processing For >>>"+eachGraphPart.usedPartNumber);
+						CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(eachGraphPart.getGraphPart());
+						if(eachGraphPart.getRilAssemblyYes().equalsIgnoreCase("Yes")) {
+							extBOMBean.setIsRILAssembly("Yes");
+						}
+						if(eachGraphPart.getIsRILPart().equalsIgnoreCase("Yes")) {
+							extBOMBean.setIsRILPart("Yes");
+						}
+						extBOMBean.setExtBOMLevel(0);
+						WTPart part = eachGraphPart.getGraphPart();
+						LOGGER.debug("part Simulate For >>>"+ eachGraphPart.getGraphPart());
+						updateChangTypeVersion(viewName, part, extBOMBean);
+						String source = eachGraphPart.getSourceattr();
+						extBOMBean.setExtBOMSource(source);
+						//Modified for WZ-60,206,207,56 START
+						WTPart resultingPart = resultigObjList.stream()
+				                .filter(rootChild -> rootChild.getNumber().equalsIgnoreCase(part.getNumber()))
+				                .findFirst()
+				                .orElse(null);
+						WTPart resultingPart1=resultingPart;
+						LOGGER.debug("<<partsTOBeCreated.size()>:"+resultingPart);
+						if(resultingPart==null) {
+							//code to handle removed resulting items
+							resultingPart=CumminsBeanHelper.getLatestDownstreamManufPart(part, viewName);
+							resultingPart=CumminsNewExtendBOMFormProcessor.previousVersionLaunch(viewName,part,resultingPart);
+
+							LOGGER.debug("<<partsTOBeCreated.getLatestDownstreamManufPart()>:"+resultingPart);
+						}
+						if(resultingPart!=null) {
+							LOGGER.debug("<<resultingPart!=null>:"+resultingPart.getIdentity());
+							WTPart mfgPrevPart=CumminsValidatePlantItems.getPreviousVersionViewPart(resultingPart);
+							WTPart latestVerPart=CumminsUtils.getLatestPart(resultingPart);
+							State state=resultingPart.getLifeCycleState();
+							boolean isMatured = (!state.equals(CumminsState.IN_WORK) && !state.equals(CumminsState.UNDERREVIEW)) ;
+							Object plantStatusForResultingPart=CumminsIBAHelper.getAttributeValue(resultingPart,CumminsPartConstantIF.PLANT_STATUS_IBA);
+							boolean isDelinkedPart=plantStatusForResultingPart!=null?plantStatusForResultingPart.toString().equalsIgnoreCase("Delinked"):false;
+							if(mfgPrevPart== null) {
+								extBOMBean.setTypeOfChange("New");
+								//Modified for WZ-676 START
+								//State state=resultingPart.getLifeCycleState();
+								//boolean isMatured = (!state.equals(CumminsState.IN_WORK) && !state.equals(CumminsState.UNDERREVIEW)) ;
+								if(isMatured) {
+									extBOMBean.setTypeOfChange("Revised");
+									Object plantStatus=CumminsIBAHelper.getAttributeValue(resultingPart,CumminsPartConstantIF.PLANT_STATUS_IBA);
+									boolean isDelinked=plantStatus!=null?plantStatus.toString().equalsIgnoreCase("Delinked"):false;
+									if(isDelinked) {
+										extBOMBean.setTypeOfChange("Relinked");
+									}
+									extBOMBean.setExtBOMState("In Work");
+									Object furtureVersion = VersionControlHelper.getNextVersionLabels(resultingPart, 1)[0];
+									extBOMBean.setUsedPartVersion(furtureVersion+" ("+viewName+")");
+								}//Modified for WZ-676 END
+							}
+							else if(isMatured && isDelinkedPart) {
+									extBOMBean.setTypeOfChange("Relinked");	
+							}
+							else{
+								extBOMBean.setTypeOfChange("Revised");
+								LOGGER.debug("extBOMBean value >>>"+ extBOMBean);
+
+								if(mfgPrevPart!= null) {
+									LOGGER.debug("<<mfgPrevPart>:"+mfgPrevPart);
+									if(isMatured) {
+										Object furtureVersion = VersionControlHelper.getNextVersionLabels(resultingPart, 1)[0];
+										extBOMBean.setUsedPartVersion(furtureVersion+" ("+viewName+")");
+									}
+								}
+								//Modified for WZ-472 Start
+								//Code to show Obsoleted
+								if(resultingPart1!=null) //We can checking for Release Target State if Part is in Resulting.
+								{
+									Transition releaseTarget = CumminsUtils.getReleaseTarget(resultingPart, (WTChangeActivity2) ca);
+									if((part.getLifeCycleState().equals(CumminsState.PENDING_OBSOLETE)||(part.getLifeCycleState().equals(CumminsState.OBSOLETE)))
+										&& releaseTarget.equals(CumminsTransition.PENDING_OBSOLETE))
+									{
+										extBOMBean.setTypeOfChange("Obsoleted");
+									}
+								}
+								else //Part is not in Resulting Item so We are considering Only Engg. Life Cycle.
+								{
+									if((part.getLifeCycleState().equals(CumminsState.PENDING_OBSOLETE)||(part.getLifeCycleState().equals(CumminsState.OBSOLETE))))
+									{
+										extBOMBean.setTypeOfChange("Obsoleted");
+									}
+								}
+								//Modified for WZ-472 End
+								
+								Object plantStatus=CumminsIBAHelper.getAttributeValue(mfgPrevPart,CumminsPartConstantIF.PLANT_STATUS_IBA);
+								boolean isDelinked=plantStatus!=null?plantStatus.toString().equalsIgnoreCase("Delinked"):false;
+								if(isDelinked) {
+									extBOMBean.setTypeOfChange("Relinked");
+								}
+							}
+							//Added for WZ-3186 start
+							if(latestVerPart!=null && !latestVerPart.getVersionIdentifier().getValue().equals(resultingPart.getVersionIdentifier().getValue())) {
+								if(isMatured) {
+								State stateLatest=latestVerPart.getLifeCycleState();
+								boolean isLatestMatured = (!stateLatest.equals(CumminsState.IN_WORK) && !stateLatest.equals(CumminsState.UNDERREVIEW)) ;
+								if(isLatestMatured) {
+								Object plantStatus=CumminsIBAHelper.getAttributeValue(latestVerPart,CumminsPartConstantIF.PLANT_STATUS_IBA);
+								boolean islinked=plantStatus!=null?plantStatus.toString().equalsIgnoreCase("Linked"):false;
+								boolean isDelinked=plantStatus!=null?plantStatus.toString().equalsIgnoreCase("Delinked"):false;
+								if(islinked) {
+									extBOMBean.setTypeOfChange("Revised");
+								}
+								if(isDelinked) {
+									extBOMBean.setTypeOfChange("Relinked");
+								}
+								}
+								}
+							}//WZ-3186 End
+							resultantPartsList.add(extBOMBean);
+							//Modified for WZ-60,206,207,56 END
+						}
+						else {
+							if(!extBOMBean.getTypeOfChange().equalsIgnoreCase("Extended")) {
+								resultantPartsList.add(extBOMBean);	
+							}else if(extBOMBean.getTypeOfChange().equalsIgnoreCase("Extended") && eachGraphPart.getIsSourceUpdated().equalsIgnoreCase("true")) {
+								resultantPartsList.add(extBOMBean);	
+							}
+						}
+					}
+				}
+				}
+				else {
+					for(WTPart errorPart:errorWTParts)
+					{
+						GraphNode errorGraph = allNodes.stream()
+				                .filter(rootChild -> rootChild.usedPartNumber.equalsIgnoreCase(errorPart.getNumber()))
+				                .findFirst()
+				                .orElse(null);
+						CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(errorGraph.getGraphPart());
+						extBOMBean.setTypeOfChange("Error");
+						extBOMBean.setExtError(errorPart);
+						resultantPartsList.add(extBOMBean);	
+					}
+					for(WTPart errorPart:errWTParts)
+					{
+						GraphNode errorGraph = allNodes.stream()
+				                .filter(rootChild -> rootChild.usedPartNumber.equalsIgnoreCase(errorPart.getNumber()))
+				                .findFirst()
+				                .orElse(null);
+						CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(errorGraph.getGraphPart());
+						extBOMBean.setTypeOfChange("Error");
+						extBOMBean.setCheckOutError(errorPart);
+						resultantPartsList.add(extBOMBean);	
+					}
+					for(WTPart errorPart:erroredWTParts)
+					{
+						GraphNode errorGraph = allNodes.stream()
+				                .filter(rootChild -> rootChild.usedPartNumber.equalsIgnoreCase(errorPart.getNumber()))
+				                .findFirst()
+				                .orElse(null);
+						CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(errorGraph.getGraphPart());
+						extBOMBean.setTypeOfChange("Error");
+						extBOMBean.setPartNotInMCNError(errorPart);
+						resultantPartsList.add(extBOMBean);	
+					}
+					for(WTPart errorPart:errorDiffMCNParts)
+					{
+						GraphNode errorGraph = allNodes.stream()
+				                .filter(rootChild -> rootChild.usedPartNumber.equalsIgnoreCase(errorPart.getNumber()))
+				                .findFirst()
+				                .orElse(null);
+						CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(errorGraph.getGraphPart());
+						extBOMBean.setTypeOfChange("Error");
+						extBOMBean.setExtDiffMCNError(errorPart);
+						resultantPartsList.add(extBOMBean);	
+					}
+				}
+				
+				sessionStorage.put("rootnodes"+ca.getNumber(), rootnodes);
+				sessionStorage.put("partsTOBeCreated"+ca.getNumber(), partsTOBeCreated);
+				sessionStorage.put("allNodes"+ca.getNumber(), allNodes);
+				if(resultantPartsList.isEmpty()) {
+					CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean();
+					extBOMBean.setTypeOfChange("Nothing to Simulate");
+					resultantPartsList.add(extBOMBean);
+				}
+				}
+				if (node == TreeNode.RootNode) {
+					List objects = getRootNodes(resultantPartsList);			
+					resultProcessor.addElements(objects);					
+				}
+				else {
+					rootnodes = (List<GraphNode>) nmCommandBean.getSessionBean().getStorage().get("rootnodes"+ca.getNumber());
+					allNodes = (List<GraphNode>) nmCommandBean.getSessionBean().getStorage().get("allNodes"+ca.getNumber());
+					partsTOBeCreated = (Map<String, GraphNode>) nmCommandBean.getSessionBean().getStorage().get("partsTOBeCreated"+ca.getNumber());
+					cumRilParts= (List<GraphNode>) nmCommandBean.getSessionBean().getStorage().get("rilComponent"+ca.getNumber());
+					List<Object> nodeList = new ArrayList<Object>();
+					nodeList.add(node);
+					LOGGER.debug("nodeList value >>>"+ nodeList);
+
+					CumminsExtendBOMBean childNode = (CumminsExtendBOMBean)node;
+					if(!("Nothing to Simulate").equalsIgnoreCase(childNode.getTypeOfChange())){
+					ArrayList<CumminsExtendBOMBean> updatedBean=new ArrayList<CumminsExtendBOMBean>();
+					if(childNode.getExtBOMLevel()==0) {
+					GraphNode childGraph = allNodes.stream()
+			                .filter(rootChild -> rootChild.usedPartNumber.equalsIgnoreCase(childNode.getUsedPartNumber()))
+			                .findFirst()
+			                .orElse(null);
+					
+					List<CumminsBOMItemListBean> mfgBOMBeanList=null;
+					List<CumminsBOMItemListBean> UpdatedmfgBOMBeanList=new ArrayList<CumminsBOMItemListBean>();
+					
+					WTPart latestMfgPart = CumminsBOMUtility.findPart(childNode.getUsedPartNumber(), viewName);
+					WTPart equaMfgPart = CumminsBeanHelper.getLatestDownstreamManufPart(childNode.getUsedByPart(), viewName);
+					equaMfgPart=CumminsNewExtendBOMFormProcessor.previousVersionLaunch(viewName,childNode.getUsedByPart(),equaMfgPart);
+                     LOGGER.debug("latestMfgPart value >>>"+ latestMfgPart);
+
+					if(equaMfgPart!=null){
+						latestMfgPart = equaMfgPart;
+					}
+					WTPart resultingPart = resultigObjList.stream()
+			                .filter(rootChild -> rootChild.getNumber().equalsIgnoreCase(childNode.getUsedPartNumber()))
+			                .findFirst()
+			                .orElse(null);
+							
+					LOGGER.debug("<<buildNodeData>> resultingPart value"+resultingPart+" ,childNode.getUsedPartNumber()"+childNode.getUsedPartNumber());		
+					if(resultingPart==null) {
+						//code to handle removed resulting items
+						resultingPart=CumminsBeanHelper.getLatestDownstreamManufPart(childNode.getUsedByPart(), viewName);
+						resultingPart=CumminsNewExtendBOMFormProcessor.previousVersionLaunch(viewName,childNode.getUsedByPart(),resultingPart);
+
+						LOGGER.debug("<<buildNodeData>> latest resultingPart value if no resulting items in MCA: "+resultingPart+" ,childNode.getUsedPartNumber()"+childNode.getUsedPartNumber());
+						
+					}
+					if(resultingPart!=null) {
+						LOGGER.debug("<<buildNodeData>> latest resultingPart value is not null: "+resultingPart.getIdentity()+" ,childNode.getUsedPartNumber()"+childNode.getUsedPartNumber());
+						WTPart mfgPrevPart=CumminsValidatePlantItems.getPreviousVersionViewPart(resultingPart);
+						LOGGER.debug("<<buildNodeData>> previous mfgPrevPart value: "+mfgPrevPart);
+						if(mfgPrevPart!=null) {
+							LOGGER.debug("<<buildNodeData>> if mfgPrevPart !=null : "+mfgPrevPart.getIdentity());
+							latestMfgPart = mfgPrevPart;
+						}
+					}
+					if(latestMfgPart!=null){
+						mfgBOMBeanList = CumminsBOMUtility.getFirstLevelBOMStructure(latestMfgPart,latestMfgPart.getViewName());
+					}
+					if(mfgBOMBeanList!=null) {
+						for(CumminsBOMItemListBean bean:mfgBOMBeanList) {
+							if(CumminsBOMUtility.findPart(bean.getUsesPartNumber(), "Engineering")!=null) {
+								UpdatedmfgBOMBeanList.add(bean);
+							}
+						}
+					}
+					if(childGraph!=null) {
+						List<GraphNode> childObj=childGraph.getChildren();
+						 if((childGraph.getSourceattr().equalsIgnoreCase("Buy")||childGraph.getSourceattr().equalsIgnoreCase("Use from other plant")) && (childGraph.getRilAssemblyYes().equalsIgnoreCase("Yes")||childGraph.getIsRILPart().equalsIgnoreCase("Yes"))) {
+
+								for(GraphNode chdObj:childObj) {
+									CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(chdObj.getGraphPart());
+									if(chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")|| chdObj.getIsRILPart().equalsIgnoreCase("Yes")) {
+										childNode.setIsRILAssembly("Yes");
+									}
+									if(chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")) {
+										extBOMBean.setIsRILAssembly("Yes");
+									}
+									LOGGER.debug("Source for Child>>>>Number>>>>"+chdObj.usedPartNumber+" Source>>>>"+chdObj.getSourceattr()+"Graph Part"+chdObj.getGraphPart());
+									extBOMBean.setExtBOMSource(chdObj.getSourceattr());
+									CumminsBOMItemListBean mbomBean =null;
+									if(!UpdatedmfgBOMBeanList.isEmpty()) {
+										mbomBean = UpdatedmfgBOMBeanList.stream()
+												.filter(mbean -> mbean.getUsesPart().getNumber().equalsIgnoreCase(chdObj.getUsedPartNumber()))
+												.findFirst()
+												.orElse(null);
+										LOGGER.debug("<<buildNodeData>> chdObj.getUsedPartNumber()"+chdObj.getUsedPartNumber());		
+										LOGGER.debug("<<buildNodeData>> mbomBean value"+mbomBean);
+									}
+									if(childNode.getTypeOfChange().equalsIgnoreCase("Relinked") && (mbomBean==null) && (chdObj.getTypeOfChange().isEmpty())) {
+										//do nothing
+									}else if(chdObj.getTypeOfChange().equalsIgnoreCase("Removed") && (chdObj.getIsRILPart().equalsIgnoreCase("Yes")|| chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes"))){
+										if(mbomBean!=null) {
+											extBOMBean.setTypeOfChange("Removed");
+											extBOMBean.setExtBOMquantity(String.valueOf(mbomBean.getQuantity()));
+											updatedBean.add(extBOMBean);
+										}
+									}
+									else if(chdObj.getIsRILPart().equalsIgnoreCase("Yes")||chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")) {
+										extBOMBean.setTypeOfChange("Added");
+										extBOMBean.setExtBOMquantity(chdObj.getQuantity());
+										if(mbomBean==null) {
+											boolean skipNotNeeded=true;
+											boolean childNone=chdObj.getSourceattr().equalsIgnoreCase("None")?true:false;
+											if(childNone) {
+												WTPart childViewObj = CumminsBOMUtility.findPart(chdObj.getUsedPartNumber(), viewName);
+												if(childViewObj==null) {
+													if(!partsTOBeCreated.keySet().contains(childNode.getUsedPartNumber())) {
+														skipNotNeeded=false;
+													}else if("Rejected".equalsIgnoreCase(chdObj.getExtBOMPlantAvailability())) {
+														skipNotNeeded=false;
+													}
+													else {
+														skipNotNeeded=false;
+													}
+												}
+											}
+											if(skipNotNeeded) {
+												updatedBean.add(extBOMBean);
+											}
+											}else {
+												String quantity = convertQuantity(Double.toString(mbomBean.getQuantity()));
+												if(!chdObj.getQuantity().equals(quantity)) {
+													extBOMBean.setTypeOfChange("Quantity Update");
+													if(childNode!=null && childNode.getTypeOfChange().equalsIgnoreCase("New")) {												
+														extBOMBean.setTypeOfChange("Added");
+													}
+													updatedBean.add(extBOMBean);
+												}
+												//Modified for WZ-60,206,207,56 START
+												if(resultingPart!=null) {	
+													if(childNode.getTypeOfChange().equalsIgnoreCase("New")) {												
+														updatedBean.add(extBOMBean);
+													}
+												}
+												//Modified for WZ-60,206,207,56 End
+											}
+									}else if(chdObj.getIsRILPart().equalsIgnoreCase("")) {
+										LOGGER.debug("<<buildNodeData>> Child Include in Structure value"+chdObj.getExtBOMIncludeInStructureUpdated());
+										LOGGER.debug("<<buildNodeData>> mbomBean value"+mbomBean);
+										if(mbomBean!=null) {
+											extBOMBean.setTypeOfChange("Removed");
+											extBOMBean.setExtBOMquantity(String.valueOf(mbomBean.getQuantity()));
+											updatedBean.add(extBOMBean);
+										}
+									}
+							}
+							}else if(cumRilParts.contains(childGraph) && (childGraph.getSourceattr().equalsIgnoreCase("Make")|| childGraph.isSoftwarePart())) {
+								List<GraphNode> makeFilteredNodes = childObj.stream()
+							            .filter(bean -> ((bean.getRilAssemblyYes().equalsIgnoreCase("Yes") || bean.getIsRILPart().equalsIgnoreCase("Yes")) && !bean.getSourceattr().equals("None")))
+							            .collect(Collectors.toList());
+								for(GraphNode chdObj:makeFilteredNodes) {
+									CumminsBOMItemListBean mbomBean =null;
+									if(!UpdatedmfgBOMBeanList.isEmpty()) {
+										mbomBean = UpdatedmfgBOMBeanList.stream()
+								                .filter(mbean -> mbean.getUsesPart().getNumber().equalsIgnoreCase(chdObj.getUsedPartNumber()))
+								                .findFirst()
+								                .orElse(null);
+									}
+									if(childNode.getTypeOfChange().equalsIgnoreCase("Relinked") && (mbomBean==null) && (chdObj.getTypeOfChange().isEmpty())) {
+										// do nothing
+									}
+									else if(!chdObj.getTypeOfChange().equalsIgnoreCase("Removed")){
+										CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(chdObj.getGraphPart());
+										if(chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")|| chdObj.getIsRILPart().equalsIgnoreCase("Yes")) {
+											childNode.setIsRILAssembly("Yes");
+										}
+										if(chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")) {
+											extBOMBean.setIsRILAssembly("Yes");
+										}
+										extBOMBean.setExtBOMSource(chdObj.getSourceattr());
+										extBOMBean.setTypeOfChange("Added");
+										extBOMBean.setExtBOMquantity(chdObj.getQuantity());
+										if(mbomBean==null) {
+											boolean skipNotNeeded=true;
+											//Code to handle None Condition
+											boolean childNone=chdObj.getSourceattr().equalsIgnoreCase("None")?true:false;
+											if(childNone) {
+												WTPart childViewObj = CumminsBOMUtility.findPart(chdObj.getUsedPartNumber(), viewName);
+												if(childViewObj==null) {
+													if(!partsTOBeCreated.keySet().contains(childNode.getUsedPartNumber())) {
+														skipNotNeeded=false;
+													}else if("Rejected".equalsIgnoreCase(chdObj.getExtBOMPlantAvailability())) {
+														skipNotNeeded=false;
+													}
+													else {
+														//Modified for STOR-2245 START
+														skipNotNeeded=false;
+														//Modified for STOR-2245 END
+													}
+												}
+											}
+											if(skipNotNeeded) {
+												updatedBean.add(extBOMBean);
+											}
+										}
+										else {
+											String quantity = convertQuantity(Double.toString(mbomBean.getQuantity()));
+											if(!chdObj.getQuantity().equals(quantity)) {
+												extBOMBean.setTypeOfChange("Quantity Update");
+												if(childNode!=null && childNode.getTypeOfChange().equalsIgnoreCase("New")) {												
+													extBOMBean.setTypeOfChange("Added");
+												}
+												updatedBean.add(extBOMBean);
+											}
+											//Modified for WZ-60,206,207,56 START
+											if(resultingPart!=null) {										
+												if(childNode.getTypeOfChange().equalsIgnoreCase("New")) {												
+													updatedBean.add(extBOMBean);
+												}
+											}
+											//Modified for WZ-60,206,207,56 End
+										}
+									}else if(!partsTOBeCreated.containsKey(chdObj.getUsedPartNumber()) && CumminsBOMUtility.findPart(chdObj.getUsedPartNumber(), "Engineering")!=null) {
+										if(mbomBean!=null) {
+											CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(chdObj.getGraphPart());
+											if(chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")|| chdObj.getIsRILPart().equalsIgnoreCase("Yes")) {
+												childNode.setIsRILAssembly("Yes");
+											}
+											if(chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")) {
+												extBOMBean.setIsRILAssembly("Yes");
+											}
+											extBOMBean.setExtBOMSource(chdObj.getSourceattr());
+											extBOMBean.setTypeOfChange("Removed");
+											extBOMBean.setExtBOMquantity(chdObj.getQuantity());	
+											updatedBean.add(extBOMBean);
+										}
+									}
+								}
+								if(mfgBOMBeanList!=null && !mfgBOMBeanList.isEmpty()){
+									List<CumminsBOMItemListBean> extraBeans = mfgBOMBeanList.stream()
+						                .filter(bean -> childObj.stream().noneMatch(b -> b.usedPartNumber.equalsIgnoreCase(bean.getUsesPartNumber()) ))
+						                .collect(Collectors.toList());
+									ArrayList<CumminsExtendBOMBean> childPartList = CumminsNewExtendBOMTreeBuilder.getChildParts(childNode, nmCommandBean,false);
+									if(childObj.isEmpty()) {
+										WTPart parentWTPart = (WTPart)childNode.getUsedByPart();								
+										extraBeans = mfgBOMBeanList.stream()
+							                .filter(bean -> childPartList.stream().noneMatch(b -> b.getUsedPartNumber().equalsIgnoreCase(bean.getUsesPartNumber()) ))
+							                .collect(Collectors.toList());
+									}
+									extraBeans = mfgBOMBeanList.stream()
+							                .filter(bean -> childPartList.stream().noneMatch(b -> b.getUsedPartNumber().equalsIgnoreCase(bean.getUsesPartNumber())))
+							                .collect(Collectors.toList());
+									for(CumminsBOMItemListBean mbe:extraBeans) {
+										CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(CumminsBOMUtility.findPart(mbe.getUsesPartNumber(), "Engineering"));
+										extBOMBean.setTypeOfChange("Removed");
+										extBOMBean.setExtBOMquantity(String.valueOf(mbe.getQuantity()));
+										updatedBean.add(extBOMBean);
+									}
+								}
+							
+								
+							}
+						else if(childGraph.getSourceattr().equalsIgnoreCase("Make")|| childGraph.isSoftwarePart()) {
+							for(GraphNode chdObj:childObj) {
+								CumminsBOMItemListBean mbomBean =null;
+								if(!UpdatedmfgBOMBeanList.isEmpty()) {
+									mbomBean = UpdatedmfgBOMBeanList.stream()
+							                .filter(mbean -> mbean.getUsesPart().getNumber().equalsIgnoreCase(chdObj.getUsedPartNumber()))
+							                .findFirst()
+							                .orElse(null);
+								}
+								if(childNode.getTypeOfChange().equalsIgnoreCase("Relinked") && (mbomBean==null) && (chdObj.getTypeOfChange().isEmpty())) {
+									// do nothing
+								}
+								else if(!chdObj.getTypeOfChange().equalsIgnoreCase("Removed")){
+									CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(chdObj.getGraphPart());
+									if(chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")|| chdObj.getIsRILPart().equalsIgnoreCase("Yes")) {
+										childNode.setIsRILAssembly("Yes");
+									}
+									if(chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")) {
+										extBOMBean.setIsRILAssembly("Yes");
+									}
+									extBOMBean.setExtBOMSource(chdObj.getSourceattr());
+									extBOMBean.setTypeOfChange("Added");
+									extBOMBean.setExtBOMquantity(chdObj.getQuantity());
+									if(mbomBean==null) {
+										boolean skipNotNeeded=true;
+										//Code to handle None Condition
+										boolean childNone=chdObj.getSourceattr().equalsIgnoreCase("None")?true:false;
+										if(childNone) {
+											WTPart childViewObj = CumminsBOMUtility.findPart(chdObj.getUsedPartNumber(), viewName);
+											if(childViewObj==null) {
+												if(!partsTOBeCreated.keySet().contains(childNode.getUsedPartNumber())) {
+													skipNotNeeded=false;
+												}else if("Rejected".equalsIgnoreCase(chdObj.getExtBOMPlantAvailability())) {
+													skipNotNeeded=false;
+												}
+												else {
+													//Modified for STOR-2245 START
+													skipNotNeeded=false;
+													//Modified for STOR-2245 END
+												}
+											}
+										}
+										if(skipNotNeeded) {
+											updatedBean.add(extBOMBean);
+										}
+									}
+									else {
+										String quantity = convertQuantity(Double.toString(mbomBean.getQuantity()));
+										if(!chdObj.getQuantity().equals(quantity)) {
+											extBOMBean.setTypeOfChange("Quantity Update");
+											if(childNode !=null && childNode.getTypeOfChange().equalsIgnoreCase("New")) {												
+												extBOMBean.setTypeOfChange("Added");
+											}
+											updatedBean.add(extBOMBean);
+										}
+										//Modified for WZ-60,206,207,56 START
+										if(resultingPart!=null) {										
+											if(childNode.getTypeOfChange().equalsIgnoreCase("New")) {												
+												updatedBean.add(extBOMBean);
+											}
+										}
+										//Modified for WZ-60,206,207,56 End
+									}
+								}else if(!partsTOBeCreated.containsKey(chdObj.getUsedPartNumber()) && CumminsBOMUtility.findPart(chdObj.getUsedPartNumber(), "Engineering")!=null) {
+									if(mbomBean!=null) {
+										CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(chdObj.getGraphPart());
+										if(chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")|| chdObj.getIsRILPart().equalsIgnoreCase("Yes")) {
+											childNode.setIsRILAssembly("Yes");
+										}
+										if(chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")) {
+											extBOMBean.setIsRILAssembly("Yes");
+										}
+										extBOMBean.setExtBOMSource(chdObj.getSourceattr());
+										extBOMBean.setTypeOfChange("Removed");
+										extBOMBean.setExtBOMquantity(chdObj.getQuantity());	
+										updatedBean.add(extBOMBean);
+									}
+								}
+							}
+							if(mfgBOMBeanList!=null && !mfgBOMBeanList.isEmpty()){
+								List<CumminsBOMItemListBean> extraBeans = mfgBOMBeanList.stream()
+					                .filter(bean -> childObj.stream().noneMatch(b -> b.usedPartNumber.equalsIgnoreCase(bean.getUsesPartNumber()) ))
+					                .collect(Collectors.toList());
+								ArrayList<CumminsExtendBOMBean> childPartList = CumminsNewExtendBOMTreeBuilder.getChildParts(childNode, nmCommandBean,false);
+								if(childObj.isEmpty()) {
+									WTPart parentWTPart = (WTPart)childNode.getUsedByPart();								
+									extraBeans = mfgBOMBeanList.stream()
+						                .filter(bean -> childPartList.stream().noneMatch(b -> b.getUsedPartNumber().equalsIgnoreCase(bean.getUsesPartNumber()) ))
+						                .collect(Collectors.toList());
+								}
+								extraBeans = mfgBOMBeanList.stream()
+						                .filter(bean -> childPartList.stream().noneMatch(b -> b.getUsedPartNumber().equalsIgnoreCase(bean.getUsesPartNumber())))
+						                .collect(Collectors.toList());
+								for(CumminsBOMItemListBean mbe:extraBeans) {
+									CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(CumminsBOMUtility.findPart(mbe.getUsesPartNumber(), "Engineering"));
+									extBOMBean.setTypeOfChange("Removed");
+									extBOMBean.setExtBOMquantity(String.valueOf(mbe.getQuantity()));
+									updatedBean.add(extBOMBean);
+								}
+							}
+						}
+						else if(childGraph.getSourceattr().equalsIgnoreCase("General")||childGraph.getSourceattr().equalsIgnoreCase("future")) {
+							boolean isParentConfigurableProduct =CumminsPartHelper.isConfigurableProduct(childGraph.getGraphPart());
+							for(GraphNode chdObj:childObj) {
+								CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(chdObj.getGraphPart());
+								LOGGER.debug("Source for Child>>>>Number>>>>"+chdObj.usedPartNumber+" Source>>>>"+chdObj.getSourceattr()+"Graph Part"+chdObj.getGraphPart());
+								extBOMBean.setExtBOMSource(chdObj.getSourceattr());
+								if(chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")|| chdObj.getIsRILPart().equalsIgnoreCase("Yes")) {
+									childNode.setIsRILAssembly("Yes");
+								}
+								if(chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")) {
+									extBOMBean.setIsRILAssembly("Yes");
+								}
+								CumminsBOMItemListBean mbomBean =null;
+								if(!UpdatedmfgBOMBeanList.isEmpty()) {
+									mbomBean = UpdatedmfgBOMBeanList.stream()
+											.filter(mbean -> mbean.getUsesPart().getNumber().equalsIgnoreCase(chdObj.getUsedPartNumber()))
+											.findFirst()
+											.orElse(null);
+									LOGGER.debug("<<buildNodeData>> chdObj.getUsedPartNumber()"+chdObj.getUsedPartNumber());		
+									LOGGER.debug("<<buildNodeData>> mbomBean value"+mbomBean);
+								}
+								if(childNode.getTypeOfChange().equalsIgnoreCase("Relinked") && (mbomBean==null) && (chdObj.getTypeOfChange().isEmpty())) {
+									//do nothing
+								}else if(chdObj.getTypeOfChange().equalsIgnoreCase("Quantity Update") && (chdObj.getIsRILPart().equalsIgnoreCase("Yes")|| chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes"))){
+									if(mbomBean!=null) {
+										extBOMBean.setTypeOfChange("Quantity Update");
+										if(childNode !=null && childNode.getTypeOfChange().equalsIgnoreCase("New")) {												
+										extBOMBean.setTypeOfChange("Added");
+										}
+										extBOMBean.setExtBOMquantity(chdObj.getQuantity());
+										if(isParentConfigurableProduct) {
+											boolean isOptionPart =CumminsPartHelper.isOptionPart(chdObj.getGraphPart());
+											if(isOptionPart) {
+												if(chdObj.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("No")) {
+													extBOMBean.setTypeOfChange("Removed");
+													extBOMBean.setExtBOMquantity(String.valueOf(mbomBean.getQuantity()));
+												}
+											}
+										}
+										updatedBean.add(extBOMBean);
+									}
+								}
+								else if(chdObj.getTypeOfChange().equalsIgnoreCase("Removed") && (chdObj.getIsRILPart().equalsIgnoreCase("Yes")|| chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes"))){
+									if(mbomBean!=null) {
+										extBOMBean.setTypeOfChange("Removed");
+										extBOMBean.setExtBOMquantity(String.valueOf(mbomBean.getQuantity()));
+										boolean isRemoveNeeded=true;
+										if(isParentConfigurableProduct) {
+											boolean isOptionPart =CumminsPartHelper.isOptionPart(chdObj.getGraphPart());
+											if(isOptionPart) {
+												if(chdObj.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("Yes")) {
+													isRemoveNeeded=false;
+												}
+											}
+										}
+										if(isRemoveNeeded) {
+										updatedBean.add(extBOMBean);
+										}
+									}
+								}	
+									else if (chdObj.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("Yes")
+											|| ((chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")
+													|| chdObj.getIsRILPart().equalsIgnoreCase("Yes"))
+													&& (childGraph.getExtBOMIncludeInStructureUpdated()
+															.equalsIgnoreCase("Yes")
+															|| cumRilParts.contains(childGraph)))
+											|| (chdObj.getTypeOfChange().equalsIgnoreCase("Added") && chdObj
+													.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("No")
+													&& cumRilParts.contains(chdObj))) {
+									extBOMBean.setTypeOfChange("Added");
+									extBOMBean.setExtBOMquantity(chdObj.getQuantity());
+									if(mbomBean==null) {
+										boolean skipNotNeeded=true;
+										boolean childNone=chdObj.getSourceattr().equalsIgnoreCase("None")?true:false;
+										if(childNone) {
+											WTPart childViewObj = CumminsBOMUtility.findPart(chdObj.getUsedPartNumber(), viewName);
+											if(childViewObj==null) {
+												if(!partsTOBeCreated.keySet().contains(childNode.getUsedPartNumber())) {
+													skipNotNeeded=false;
+												}else if("Rejected".equalsIgnoreCase(chdObj.getExtBOMPlantAvailability())) {
+													skipNotNeeded=false;
+												}
+												else {
+													skipNotNeeded=false;
+												}
+											}
+										}
+										if(skipNotNeeded) {
+											updatedBean.add(extBOMBean);
+										}
+										}else {
+											String quantity = convertQuantity(Double.toString(mbomBean.getQuantity()));
+											if(!chdObj.getQuantity().equals(quantity)) {
+												extBOMBean.setTypeOfChange("Quantity Update");
+												if(childNode !=null && childNode.getTypeOfChange().equalsIgnoreCase("New")) {												
+													extBOMBean.setTypeOfChange("Added");
+												}
+												updatedBean.add(extBOMBean);
+											}
+											//Modified for WZ-60,206,207,56 START
+											if(resultingPart!=null) {	
+												if(childNode.getTypeOfChange().equalsIgnoreCase("New")) {												
+													updatedBean.add(extBOMBean);
+												}
+											}
+											//Modified for WZ-60,206,207,56 End
+										}
+								}
+								//Added for Bug WZ-2188 START
+								else if(chdObj.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("No") && (chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")||chdObj.getIsRILPart().equalsIgnoreCase("Yes")) && chdObj.getTypeOfChange().equalsIgnoreCase("")){
+										if(isParentConfigurableProduct) {
+											boolean isOptionPart =CumminsPartHelper.isOptionPart(chdObj.getGraphPart());
+											if(isOptionPart) {
+													extBOMBean.setTypeOfChange("Removed");
+												}
+											}
+										updatedBean.add(extBOMBean);
+									}
+									//Added for Bug WZ-2188 END
+								else if(chdObj.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("No") && (chdObj.getRilAssemblyYes().equalsIgnoreCase("Yes")||chdObj.getIsRILPart().equalsIgnoreCase("Yes"))) {
+									//do Nothing
+								}
+								else if(chdObj.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("No")) {
+									LOGGER.debug("<<buildNodeData>> Child Include in Structure value"+chdObj.getExtBOMIncludeInStructureUpdated());
+									LOGGER.debug("<<buildNodeData>> mbomBean value"+mbomBean);
+									if(mbomBean!=null) {
+										extBOMBean.setTypeOfChange("Removed");
+										extBOMBean.setExtBOMquantity(String.valueOf(mbomBean.getQuantity()));
+										updatedBean.add(extBOMBean);
+									}
+								}
+						}
+					}else if(childGraph.getSourceattr().equalsIgnoreCase("Buy")||childGraph.getSourceattr().equalsIgnoreCase("Use from other plant")) {
+						for(CumminsBOMItemListBean bean:mfgBOMBeanList) {
+							CumminsExtendBOMBean extBOMBean = new CumminsExtendBOMBean(CumminsBOMUtility.findPart(bean.getUsesPartNumber(), "Engineering"));
+							extBOMBean.setTypeOfChange("Removed");
+							extBOMBean.setExtBOMquantity(String.valueOf(bean.getQuantity()));
+							updatedBean.add(extBOMBean);
+						}
+					}
+					}
+					}
+					
+					//List of ChildFrom GraphNode and get its Children
+					childNode.setTargetViewName(viewName);
+					WTPart nodePart=childNode.getUsedByPart();
+					
+					if(childNode.getExtBOMLevel()==0) {
+						ArrayList<CumminsExtendBOMBean> listBean = getNodes(nodeList, nmCommandBean);
+						
+						listBean.addAll(updatedBean);
+						LOGGER.debug("<<buildNodeData>> listBean value at the end"+listBean);
+						for(CumminsExtendBOMBean childBean : listBean) {
+							if(checkIsRILPart(childBean.getUsedByPart())) {
+								if(!"Yes".equalsIgnoreCase(childNode.getIsRILAssembly())){
+									childNode.setIsRILAssembly("Yes");
+								}
+								childBean.setIsRILPart("Yes");
+							}
+							updateVersionForChild(viewName,childBean,partsTOBeCreated);
+						}
+						
+						resultProcessor.addElements(listBean);
+					}
+				}
+			}
+			}
+		}catch(Exception e) {
+			e.printStackTrace();
+			LOGGER.error("----CumminsSimulateMBOMTreeBuilder----<buildNodeData() >"+e);
+		}finally
+		{
+			SessionServerHelper.manager.setAccessEnforced(byPassAccess);
+		}
+	}
+	
+	
+		private static boolean checkIsRILPart(WTPart ebomPart) {
+			try {
+					if(("Yes").equals(CumminsUtils.getAttributeValue(ebomPart.getMaster(),InterfaceConstant.IBA_RIL_INDICATOR))) {
+						return true;
+					}
+			} catch (WTException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}	
+			return false;
+		}
+	
+
+	private void updateVersionForChild(String viewName,CumminsExtendBOMBean extBOMBean, Map<String, GraphNode> partsTOBeCreated) {
+
+		try { 
+			WTPart eachGraphPart=extBOMBean.getUsedByPart();
+			LOGGER.debug("--------START --CumminsSimulateMBOMTreeBuilder----updateVersionForChild()....");
+			WTPart mpart = CumminsBOMUtility.findPart(eachGraphPart.getNumber(), viewName);
+			extBOMBean.setExtBOMState("In Work");
+			if(mpart==null) {
+				extBOMBean.setUsedPartVersion(extBOMBean.getUsedByPart().getVersionIdentifier().getValue()+" ("+viewName+")");
+			}
+			else {
+				WTPart equaMfgPart = CumminsBeanHelper.getLatestDownstreamManufPart(eachGraphPart, viewName);
+				equaMfgPart=CumminsNewExtendBOMFormProcessor.previousVersionLaunch(viewName,eachGraphPart,equaMfgPart);
+				if(equaMfgPart==null && mpart!=null) {					
+					Object enggVersion=extBOMBean.getUsedByPart().getVersionIdentifier().getValue();
+					Object furtureVersion = VersionControlHelper.getNextVersionLabels(mpart, 1)[0];
+					if(compareVersions(enggVersion,furtureVersion)) {
+						furtureVersion=enggVersion;
+					}
+					//Modified for WZ-56 START
+					extBOMBean.setUsedPartVersion(furtureVersion+" ("+viewName+")");
+					boolean latestPresent = mpart!=null && equaMfgPart==null? true : false ;
+					if(latestPresent && !partsTOBeCreated.containsKey(extBOMBean.getUsedPartNumber())) {
+						extBOMBean.setUsedPartVersion(mpart.getVersionIdentifier().getValue()+" ("+viewName+")");//previous version
+						extBOMBean.setExtBOMState(mpart.getLifeCycleState().getDisplay());
+					}
+					else if(partsTOBeCreated.containsKey(extBOMBean.getUsedPartNumber())) {
+						extBOMBean.setUsedPartVersion(furtureVersion+" ("+viewName+")");						
+					//Modified for WZ-56 END
+					}
+				}
+				else {
+					extBOMBean.setExtBOMState(equaMfgPart.getLifeCycleState().getDisplay());
+					extBOMBean.setUsedPartVersion(equaMfgPart.getVersionIdentifier().getValue()+" ("+viewName+")");
+				}
+				if(extBOMBean.getTypeOfChange().equalsIgnoreCase("Removed")) {
+					extBOMBean.setExtBOMState(mpart.getLifeCycleState().getDisplay());
+					extBOMBean.setUsedPartVersion(mpart.getVersionIdentifier().getValue()+" ("+viewName+")");
+				}
+			}
+		}catch(Exception e) {
+			e.printStackTrace();
+			LOGGER.error("----CumminsSimulateMBOMTreeBuilder---- <updateVersionForChild()>"+e);
+		}
+	
+		
+	}
+
+	public static Map<String, GraphNode> createPartsBasedOnParent(GraphNode lastChild, GraphNode root,
+			Map<String, GraphNode> partsTOBeCreated, List<WTPart> resultigObjList) throws WTException, JSONException {
+		
+		LOGGER.debug("Class CumminsSimulateMBOMTreeBuilder---->createPartsBasedOnParent()Method Initiated....");
+		LOGGER.debug("Child src- "+lastChild.getSourceattr());
+		
+		if (!lastChild.getSourceattr().equals("None")) {
+			if (root.usedPartNumber.equals(lastChild.usedPartNumber)
+					&& !partsTOBeCreated.containsKey(lastChild.usedPartNumber)) {
+				if(!root.getSourceattr().equals("None")) {
+					partsTOBeCreated.put(lastChild.usedPartNumber,lastChild);
+				}
+				return null;
+			}
+			List<GraphNode> orphanChildParents = new ArrayList();
+			orphanChildParents = GraphNode.getParentNode(lastChild, root, orphanChildParents);
+			//Create Child Based on Parent Decision-Start
+			
+			for (GraphNode eachParent : orphanChildParents) {
+				boolean creationForChildRestricted=false;
+				if(eachParent.getIsSourceUpdated().equals("true")) {
+					if(eachParent.getSourceattr().equalsIgnoreCase("Make")||eachParent.isSoftwarePart()) {
+						creationForChildRestricted=true;
+					}
+					else if((eachParent.getSourceattr().equalsIgnoreCase("General")
+						|| eachParent.getSourceattr().equalsIgnoreCase("Future")) && lastChild.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("Yes") ) {
+						creationForChildRestricted=true;
+					}	
+				}else {
+					if(eachParent.getSourceattr().equalsIgnoreCase("Make")||eachParent.isSoftwarePart()) {
+						boolean	checkParentDecision=CumminsNewExtendBOMFormProcessor.createChildBasedOnParentDecision(eachParent,root);
+						if(checkParentDecision) {
+							creationForChildRestricted=true;
+						}
+					}
+				}
+				if(creationForChildRestricted) {
+					if(lastChild.getTypeOfChange().equalsIgnoreCase("Removed") && (eachParent.getSourceattr().equalsIgnoreCase("Make")||eachParent.isSoftwarePart()) && !lastChild.getIsSourceUpdated().equals("true")) {
+						creationForChildRestricted = false;
+					}
+				}
+				if(creationForChildRestricted) {
+					WTPart eqMfgPart=lastChild.getEqMfgPart();
+					boolean latestPresent = lastChild.getLatestMfgPart()!=null && eqMfgPart==null;
+					boolean mfgpresent = eqMfgPart!=null?true:false;
+					boolean eqMfgAvailable=!lastChild.getIsSourceUpdated().equalsIgnoreCase("true") && (latestPresent||mfgpresent);
+					//Modified for WZ-60,206,207,56 START
+					if(eqMfgAvailable) {
+						if(!resultigObjList.isEmpty() && resultigObjList!=null) {
+							//Modified for WZ-60,206,207,56 START
+							WTPart resultingPart = resultigObjList.stream()
+				                .filter(rootChild -> rootChild.getNumber().equalsIgnoreCase(lastChild.getUsedPartNumber()))
+				                .findFirst()
+				                .orElse(null);
+							if(resultingPart!=null) {
+								partsTOBeCreated.put(lastChild.usedPartNumber,lastChild);
+							}
+						}
+						//Modified for WZ-60,206,207,56 END
+					}
+					else{
+						//Modified for WZ-60,206,207,56 START
+						if(lastChild.getLatestMfgPart()!=null && eqMfgPart!=null 
+								&& eqMfgPart.equals(lastChild.getLatestMfgPart()) && !lastChild.getIsSourceUpdated().equalsIgnoreCase("true")){
+							//DO Nothing
+						} //Modified for WZ-60,206,207,56 END
+						else {
+							partsTOBeCreated.put(lastChild.usedPartNumber,lastChild);
+						}
+					}
+				}
+				createPartsBasedOnParent(eachParent, root, partsTOBeCreated, resultigObjList);
+			}
+			//Create child Based on Parent Decision-End
+			// Code to ensure child gets created if decision is Made to create in UI but in this case parent travasal will not happen
+			if (!partsTOBeCreated.containsKey(lastChild.usedPartNumber) && lastChild.getIsSourceUpdated().equals("true")) {
+				WTPart eqMfgPart=lastChild.getEqMfgPart();
+				boolean latestPresent = lastChild.getLatestMfgPart()!=null && eqMfgPart==null;
+				boolean mfgpresent = eqMfgPart!=null?true:false;
+				boolean eqMfgAvailable=!lastChild.getIsSourceUpdated().equalsIgnoreCase("true") && (latestPresent||mfgpresent);
+				if(eqMfgAvailable) {
+					//Modified for WZ-60,206,207,56 START
+					if(!resultigObjList.isEmpty() && resultigObjList!=null) {
+						WTPart resultingPart = resultigObjList.stream()
+								.filter(rootChild -> rootChild.getNumber().equalsIgnoreCase(lastChild.getUsedPartNumber()))
+								.findFirst()
+								.orElse(null);
+						if(resultingPart!=null) {
+							partsTOBeCreated.put(lastChild.usedPartNumber,lastChild);
+						}
+					}
+					//Modified for WZ-60,206,207,56 END
+				}
+				else{
+				partsTOBeCreated.put(lastChild.usedPartNumber,lastChild);
+				}
+			}
+		}
+		else {
+			if(!root.equals(lastChild)) {
+				List<GraphNode> orphanChildParents = new ArrayList();
+				orphanChildParents = GraphNode.getParentNode(lastChild, root, orphanChildParents);
+				for (GraphNode eachParent : orphanChildParents) {
+					createPartsBasedOnParent(eachParent, root, partsTOBeCreated,resultigObjList);
+				}
+			}
+		}
+		return partsTOBeCreated;
+	}
+	
+	public List getRootNodes(List<NmSimpleOid> wTPartsList) throws WTException {		
+		return wTPartsList;
+	}
+	
+	/**
+	 * API is used to get Child Items
+	 * 
+	 * @param parents
+	 * @return
+	 * @throws WTException
+	 */
+	public ArrayList<CumminsExtendBOMBean> getNodes(List<Object> parents, NmCommandBean nmCommandBean) throws WTException {
+		LOGGER.debug("Start  getNodes" + parents.size());
+		Map<Object, List> result = new HashMap<Object, List>();
+		ArrayList<CumminsExtendBOMBean> childPartList = new ArrayList<CumminsExtendBOMBean>();
+		/*
+		 * for (Object i : parents) { LOGGER.debug("For Each Part" + i); try { if (i
+		 * instanceof CumminsExtendBOMBean) {
+		 * LOGGER.debug("i instanceof CumminsExtendBOMBean" ); CumminsExtendBOMBean
+		 * parent = (CumminsExtendBOMBean) i; WTPart parentWTPart =
+		 * (WTPart)parent.getUsedByPart(); childPartList =
+		 * CumminsNewExtendBOMTreeBuilder.getChildParts(parent, nmCommandBean);
+		 * LOGGER.debug("childPartList " + childPartList);
+		 * 
+		 * } } catch (Exception e) { // TODO Auto-generated catch block
+		 * e.printStackTrace(); } }
+		 */
+		LOGGER.debug("Child Parts : " + result);
+		return childPartList;
+	}
+	
+	//need to Optimize code for performance
+	/*private ArrayList<CumminsExtendBOMBean> updateListBean(List<GraphNode> rootnodes, ArrayList<CumminsExtendBOMBean> listBean, CumminsExtendBOMBean nodePart)
+			throws WTException, Exception, VersionControlException {
+		
+			LOGGER.debug("--------START --CumminsSimulateMBOMTreeBuilder----updateListBean()....");
+			List<CumminsBOMItemListBean> mfgBOMBeanList = null;
+			ArrayList<WTPart> bomMfgItemPartList = new ArrayList<WTPart>();
+			ArrayList<String> listBeanPartList  = new ArrayList<String>();
+			ArrayList<WTPart> removedParList  = new ArrayList<WTPart>();
+			ArrayList<CumminsExtendBOMBean> extRemovedBOMBeanList = new ArrayList<CumminsExtendBOMBean>();
+			ArrayList<CumminsExtendBOMBean> extAddedBOMBeanList = new ArrayList<CumminsExtendBOMBean>();
+		try { 
+			WTPart latestMfgPart = CumminsBOMUtility.findPart(nodePart.getUsedByPart().getNumber(), nodePart.getTargetViewName());latestMfgPart.getIterationDisplayIdentifier();
+			WTPart equaMfgPart = CumminsBeanHelper.getLatestDownstreamManufPart(nodePart.getUsedByPart(), nodePart.getTargetViewName());equaMfgPart.getIterationDisplayIdentifier();
+			if(equaMfgPart!=null){
+				latestMfgPart = equaMfgPart;
+			}
+			if(latestMfgPart!=null){
+				mfgBOMBeanList = CumminsBOMUtility.getFirstLevelBOMStructure(latestMfgPart,latestMfgPart.getViewName());
+				for (CumminsExtendBOMBean eachListBean  : listBean) {
+					WTPart wtPart = eachListBean.getUsedByPart();
+					listBeanPartList.add(wtPart.getNumber());
+				}
+				// condition for Removal of non Manufacturing option part/Manufacturing part
+				for (CumminsBOMItemListBean mfgbomBean : mfgBOMBeanList) {
+					WTPart mfgPart = mfgbomBean.getUsesPart(); mfgPart.getViewName();
+					bomMfgItemPartList.add(mfgPart);
+					if(!listBeanPartList.contains(mfgPart.getNumber())) {
+						WTPart corresEnggPart=CumminsBOMUtility.findPart(mfgPart.getNumber(), "Engineering");
+						if(corresEnggPart!=null) {
+							CumminsExtendBOMBean extRemovedBOMBean = new CumminsExtendBOMBean(mfgPart);
+							extRemovedBOMBean.setExtBOMLevel(1);
+							extRemovedBOMBean.setTypeOfChange("Removed");
+							extRemovedBOMBeanList.add(extRemovedBOMBean);
+						}
+					}
+				}				
+			}
+			
+			for (GraphNode root : rootnodes) {
+				if(root.getSourceattr().equalsIgnoreCase("General") || root.getSourceattr().equalsIgnoreCase("Future")) {
+					List<GraphNode> childGraphs = root.getChildren();
+					for(GraphNode eachChild : childGraphs) {
+						if(eachChild.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("No")){
+							for(CumminsExtendBOMBean eachBOMBean : listBean) {
+								if((eachChild.getUsedPartNumber()).equalsIgnoreCase(eachBOMBean.getUsedPartNumber())){
+									if(bomMfgItemPartList!=null && bomMfgItemPartList.contains(eachBOMBean.getUsedByPart())) {
+										eachBOMBean.setTypeOfChange("Removed");
+									}
+									else {
+										listBean.remove(eachBOMBean);
+									}									
+								}								
+							}
+						}
+						else if(eachChild.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("Yes")){
+							for(CumminsExtendBOMBean eachBOMBean : listBean) {
+								if(bomMfgItemPartList!=null && !bomMfgItemPartList.contains(eachBOMBean.getUsedByPart())) {
+									eachBOMBean.setTypeOfChange("Added");
+								}
+							}
+						}
+					}					
+				}
+				else if(root.getSourceattr().equalsIgnoreCase("Buy") || root.getSourceattr().equalsIgnoreCase("Use from other plant")) {
+					List<GraphNode> childGraphs = root.getChildren();
+					for(GraphNode eachChild : childGraphs) {
+						for(CumminsExtendBOMBean eachBOMBean : listBean) {
+							if((eachChild.getUsedPartNumber()).equalsIgnoreCase(eachBOMBean.getUsedPartNumber())){
+								listBean.remove(eachBOMBean);
+							}
+						}
+					}					
+				}
+			}	
+			
+			if(extRemovedBOMBeanList!=null){
+				listBean.addAll(extRemovedBOMBeanList);				
+			}
+			if(extAddedBOMBeanList!=null){
+				listBean.addAll(extAddedBOMBeanList);				
+			}
+		}catch(Exception e) {
+			e.printStackTrace();
+			LOGGER.error("----CumminsSimulateMBOMTreeBuilder---- <updateListBean()>"+e);
+		}
+		return listBean;
+	}*/
+	
+	private void updateChangTypeVersion(String viewName, WTPart eachGraphPart, CumminsExtendBOMBean extBOMBean)
+			throws WTException, Exception, VersionControlException {
+		try { 
+			LOGGER.debug("Class CumminsSimulateMBOMTreeBuilder---->updateChangTypeVersion()Method Initiated....");
+			extBOMBean.setExtBOMState("In Work");
+			WTPart mpart = CumminsBOMUtility.findPart(eachGraphPart.getNumber(), viewName);
+			Object enggVersion=extBOMBean.getUsedByPart().getVersionIdentifier().getValue();
+			if(mpart==null) {
+				if(extBOMBean.getExtBOMLevel()==0) {
+					extBOMBean.setTypeOfChange("New");
+				}else {
+					extBOMBean.setTypeOfChange("Added");
+				}				
+				extBOMBean.setUsedPartVersion(extBOMBean.getUsedByPart().getVersionIdentifier().getValue()+" ("+viewName+")");
+			}
+			else {
+				WTPart equaMfgPart = CumminsBeanHelper.getLatestDownstreamManufPart(eachGraphPart, viewName);
+				equaMfgPart=CumminsNewExtendBOMFormProcessor.previousVersionLaunch(viewName,eachGraphPart,equaMfgPart);
+
+				if(equaMfgPart!=null) {
+					WTPart updatedEquaMfgPart = CumminsBeanHelper.getLatestDownstreamManufPartForActionDateForCurrentStatus(eachGraphPart, viewName); 
+					if(updatedEquaMfgPart!=null && !equaMfgPart.equals(updatedEquaMfgPart)){
+						WTPart updatedEquEngPart = CumminsBeanHelper.getLatestUpstreamEnggPart(updatedEquaMfgPart);
+						if(updatedEquEngPart.equals(eachGraphPart)){
+							equaMfgPart = updatedEquaMfgPart;
+						}
+					}
+				}
+				if(equaMfgPart==null && mpart!=null) {				
+					if(extBOMBean.getExtBOMLevel()==0) {
+						extBOMBean.setTypeOfChange("Revised");
+						
+						//Modified for WZ-472 Start
+						//Code to show Obsoleted
+						if((eachGraphPart.getState().getState().equals(CumminsState.PENDING_OBSOLETE)||(eachGraphPart.getState().getState().equals(CumminsState.OBSOLETE))))
+						{
+							extBOMBean.setTypeOfChange("Obsoleted");
+						}
+						//Modified for WZ-472 End
+						
+						//STOR-2103-Start
+						Object plantStatus=CumminsIBAHelper.getAttributeValue(mpart,CumminsPartConstantIF.PLANT_STATUS_IBA);
+						boolean isDelinked=plantStatus!=null?plantStatus.toString().equalsIgnoreCase("Delinked"):false;
+						if(isDelinked) {
+							extBOMBean.setTypeOfChange("Relinked");
+						}
+						//STOR-2103-End
+					}
+					else {
+						extBOMBean.setTypeOfChange("Added");
+					}
+					Object furtureVersion = VersionControlHelper.getNextVersionLabels(mpart, 1)[0];
+					if(compareVersions(enggVersion,furtureVersion)) {
+						furtureVersion=enggVersion;
+					}
+					extBOMBean.setUsedPartVersion(furtureVersion+" ("+viewName+")");
+				}
+				else {
+					extBOMBean.setExtBOMState(equaMfgPart.getLifeCycleState().getDisplay());
+					Object furtureVersionmfg = equaMfgPart.getVersionIdentifier().getValue();
+					extBOMBean.setUsedPartVersion(furtureVersionmfg+" ("+viewName+")");
+					if(equaMfgPart.equals(mpart) && extBOMBean.getExtBOMLevel()==0)
+					{
+						extBOMBean.setTypeOfChange("Extended");
+						
+						// updated code to check for source change of 0th position
+						if(equaMfgPart.getState().getState().equals(CumminsState.RELEASED) || equaMfgPart.getState().getState().equals(CumminsState.PENDING_OBSOLETE)
+								|| equaMfgPart.getState().getState().equals(CumminsState.LIMITED_USAGE) || equaMfgPart.getState().getState().equals(CumminsState.OBSOLETE)) {
+							extBOMBean.setTypeOfChange("Relinked");
+							extBOMBean.setExtBOMState("In Work");
+						}
+						//Code to Show Relink
+						if(CumminsValidatePlantItems.isChildDelinked(eachGraphPart,CumminsPlantHelper.getPlantbyName(viewName))) {
+							extBOMBean.setTypeOfChange("Relinked");
+							extBOMBean.setExtBOMState("In Work");
+							Object furtureVersion = VersionControlHelper.getNextVersionLabels(mpart, 1)[0];
+							if(compareVersions(enggVersion,furtureVersion)) {
+								furtureVersion=enggVersion;
+							}
+							extBOMBean.setUsedPartVersion(furtureVersion+" ("+viewName+")");
+						}
+					}
+					else if(extBOMBean.getTypeOfChange().isEmpty()) {
+						if(extBOMBean.getExtBOMLevel()==0){
+							extBOMBean.setTypeOfChange("Extended");
+						}else{
+							extBOMBean.setTypeOfChange("Added");
+						}
+					}
+				}
+			}
+		}catch(Exception e) {
+			e.printStackTrace();
+			LOGGER.error("----CumminsSimulateMBOMTreeBuilder---- <updateChangTypeVersion()>"+e);
+		}
+	}
+	 public static boolean compareVersions(Object version1Obj, Object version2Obj) {
+	        String version1 = version1Obj.toString();
+	        String version2 = version2Obj.toString();
+	        
+	        try {
+	            int num1 = Integer.parseInt(version1);
+	            int num2 = Integer.parseInt(version2);
+	            return num1 > num2;
+	        } catch (NumberFormatException e) {
+	            // If conversion to integer fails, use lexicographical comparison
+	            return version1.compareTo(version2) > 0;
+	        }
+	    }
+	 
+	 public String convertQuantity(String extBOMquantity) {
+		try {
+			double doubleValue = Double.parseDouble(extBOMquantity);
+		    if (doubleValue == (int) doubleValue) {
+		    	extBOMquantity= String.valueOf((int) doubleValue);
+		    } else {
+		        extBOMquantity= String.valueOf(doubleValue);
+		    }
+		}catch(Exception e) {
+			LOGGER.debug("<<convertQuantity>> Exception while converting to Quantity");
+		}
+		return extBOMquantity;
+	}
+
+}
