@@ -1,0 +1,1947 @@
+/**  
+ * ----------------------------------------------------------------------------
+ * Copyright (c) Tata Consultancy Services (TCS) or Cummins Inc.
+ * All Rights Reserved .
+ *   
+ * Copying or reproduction without any prior written approval is prohibited.
+ *-----------------------------------------------------------------------------
+ */
+
+package ext.cummins.mpml.visitor;
+
+import java.rmi.RemoteException;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
+import java.util.stream.Collectors;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import com.ptc.core.lwc.server.PersistableAdapter;
+import com.ptc.core.meta.server.TypeIdentifierUtility;
+import com.ptc.windchill.mpml.MPMPartToPlantAssignmentLink;
+import com.ptc.windchill.mpml.resource.MPMPlant;
+
+import ext.cummins.interfaces.common.services.StructureProcessor;
+import ext.cummins.interfaces.utils.InterfaceConstant;
+import ext.cummins.interfaces.utils.InterfaceExecutionHelper;
+import ext.cummins.lifecycle.CumminsState;
+import ext.cummins.mpml.builder.CumminsValidatePlantItems;
+import ext.cummins.mpml.services.CumminsCopyBOM;
+import ext.cummins.mpml.services.GraphNode;
+import ext.cummins.mpml.util.CumminsBOMUtility;
+import ext.cummins.mpml.util.GenericObjectService;
+import ext.cummins.part.CumminsPartConstantIF;
+import ext.cummins.part.CumminsPartHelper;
+import ext.cummins.plant.CumminsPlantConstantIF;
+import ext.cummins.plant.util.CumminsPlantHelper;
+import ext.cummins.structure.CumminsStructureHelper;
+import ext.cummins.utils.CumminsConstantIF;
+import ext.cummins.utils.CumminsIBAHelper;
+import ext.cummins.utils.CumminsPropertyHelper;
+import ext.cummins.utils.CumminsUtils;
+import ext.cummins.workflow.CumminsMfgWorkflowHelper;
+import wt.associativity.EquivalenceLink;
+import wt.associativity.WTAssociativityHelper;
+import wt.change2.ChangeRecord2;
+import wt.change2.WTChangeActivity2;
+import wt.fc.Persistable;
+import wt.fc.PersistenceHelper;
+import wt.fc.QueryResult;
+import wt.fc.WTObject;
+import wt.lifecycle.Transition;
+import wt.org.WTPrincipal;
+import wt.part.WTPart;
+import wt.part.WTPartHelper;
+import wt.part.WTPartMaster;
+import wt.part.WTPartStandardConfigSpec;
+import wt.part.WTPartSubstituteLink;
+import wt.part.WTPartUsageLink;
+import wt.pom.Transaction;
+import wt.session.SessionHelper;
+import wt.util.WTException;
+import wt.util.WTPropertyVetoException;
+import wt.vc.VersionControlException;
+import wt.vc.VersionControlHelper;
+import wt.vc.VersionIdentifier;
+import wt.vc.struct.StructHelper;
+import wt.vc.views.View;
+import wt.vc.views.ViewHelper;
+import wt.vc.wip.WorkInProgressHelper;
+import wt.vc.wip.Workable;
+
+/**
+ *
+ * <b>Class:</b> CumminsValidatePlantItems.java <br>
+ * <br>
+ * <b> Description:</b> This class is for comparing MBOM with EBOM <br>
+ * <br>
+ *
+ * @author Tata Consultancy Services (TCS) <br>
+ * 
+ *
+ */
+
+public class CumminsBeanHelper {
+
+	/** The Constant CLASSNAME. */
+	private static final String CLASSNAME = CumminsBeanHelper.class.getName();
+
+	/** The Constant LOGGER. */
+	private static final Logger LOGGER = LogManager.getLogger(CLASSNAME);
+
+	/** The Constant MANUFACTURING_PART. */
+	private static final String MANUFACTURING_PART = "ManufacturingPart";
+
+	/** The Constant MANUFACTURING_OPTION_PART. */
+	private static final String MANUFACTURING_OPTION_PART = "CumminsManufacturingOptionPart";
+
+	/** The Constant EXCEPTION. */
+	private static final String EXCEPTION = " is Failed. Exception -";
+
+	/** The Constant PART. */
+	private static final String PART = "Part ";
+
+	/** The Constant EBOMTOMBOM. */
+	private static final String EBOMTOMBOM = "mbom.attributeSync.ebomtombom.";
+
+	private static List<String> sourceUpdatedPartsList = null;
+	
+	public static boolean checkForObsolence(ChangeRecord2 record, WTPart part) throws WTException, Exception {
+		try {
+			Transition targetState = record.getTargetTransition();
+			if (targetState.equals(Transition.OBSOLESCENCE)) {
+				return true;
+			}
+		} catch (Exception e) {
+			LOGGER.debug("" + e);
+		}
+		return false;
+	}
+
+    public static ArrayList<CumminsWhereUsedBean> getWhereUsedObjs(WTPart wtPart) throws WTException, Exception {
+
+        //List<WTPart> partList = CumminsStructureHelper.getAllParentsOfParentView(wtPart);
+        HashMap<String, ArrayList<WTPart>> parentPartList=CumminsStructureHelper.getallParentPartMap(wtPart);
+        List<WTPart> partList = null;
+        
+        if(parentPartList != null) {                  
+            partList = (ArrayList)parentPartList.get(wtPart.getNumber());
+        }
+        
+        LOGGER.debug("partList ---> " + partList);
+        ArrayList<CumminsWhereUsedBean> parentBeanList = new ArrayList<>();
+        try {
+            for (WTPart parentPart : partList) {
+                LOGGER.debug("whereUsedPart = " + parentPart.getIdentity());
+                parentBeanList.add(new CumminsWhereUsedBean(parentPart));
+            }
+        } catch (Exception e) {
+            LOGGER.debug("Error in CumminsBeanHelper:getWhereUsedObjs() " + e);
+        }
+        return parentBeanList;
+	}
+
+	public static ArrayList<CumminsChildObjectBean> getChildObjectsBean(WTPart wtPart) throws WTException, Exception {
+
+		ArrayList<WTPart> partList = CumminsStructureHelper.getAllChilds(wtPart);
+		ArrayList<CumminsChildObjectBean> childBeanList = new ArrayList<>();
+		try {
+
+			for (WTPart childPart : partList) {
+				if (childPart.getView().equals(wtPart.getView())) {
+					childBeanList.add(new CumminsChildObjectBean(childPart));
+				}
+			}
+		} catch (Exception e) {
+			LOGGER.debug("" + e);
+		}
+		return childBeanList;
+	}
+	
+	
+	public static boolean checkChildInStructure(WTPart parentPart,WTPart childPart) {
+		Boolean isChildInParent=false;
+		if(parentPart ==null || childPart ==null) {
+			return isChildInParent;
+		}
+		try {
+		QueryResult queryresult = PersistenceHelper.manager.navigate(parentPart, WTPartUsageLink.ROLE_BOBJECT_ROLE,
+				WTPartUsageLink.class, true);
+		
+
+		while (queryresult.hasMoreElements()) {
+			try {
+				WTPartMaster masObject=((WTPartMaster) queryresult.nextElement());
+				if(masObject.getNumber().equals(childPart.getNumber())) {
+					return true;
+				}
+				
+			} catch (Exception e) {
+				LOGGER.info(e);
+				LOGGER.error("Exception caught while finding part"+e.getLocalizedMessage());
+			}
+			
+		}
+		} catch (Exception e) {
+			LOGGER.info(e);
+			LOGGER.error("Exception caught while finding part"+e.getLocalizedMessage());
+		}
+		return isChildInParent;
+	}
+
+	public static boolean isChild(WTPart wtpart) throws WTException {
+		QueryResult result = CumminsBOMUtility.getUsedByLinks(wtpart.getMaster());
+		if (result.size() > 0) {
+			return true;
+		}
+		return false;
+	}
+
+	public static CumminsResultantObjectsBean isPartAvailableInResultantObjects(WTPart wtPart,
+			List<CumminsResultantObjectsBean> resultantObjectsBeanList) {
+		for (CumminsResultantObjectsBean resBean : resultantObjectsBeanList) {
+			WTPart resPart = resBean.getResultantObject();
+			if (resPart.equals(wtPart)) {
+				return resBean;
+			}
+		}
+		return null;
+	}
+
+	public static Date getProposedDate(WTChangeActivity2 mca, WTPart wtPart) throws Exception {
+		Date proposedeffectivityDate = null;
+		Map<String, String> effMap = CumminsMfgWorkflowHelper.getClientEffGroupMaP(mca);
+		if (effMap != null && effMap.containsKey(wtPart.getNumber())) {
+			LOGGER.debug("Start - 4");
+			String effDateString = effMap.get(wtPart.getNumber());
+			String[] array = effDateString.split("-");
+			String sDate = array.length > 0 ? array[0].trim() : null;
+			Timestamp timeStampEffecDate = CumminsMfgWorkflowHelper.getOutputInTimestamp(sDate);
+			if (timeStampEffecDate != null) {
+				LOGGER.debug("Start - 5");
+				proposedeffectivityDate = new Date(timeStampEffecDate.getTime());
+			}
+		}
+		return proposedeffectivityDate;
+	}
+	
+	public static boolean isPurposeSetToDelink(ChangeRecord2 changeRecord) {
+		boolean isDelinked=false;
+		try
+		{
+			String purposeVal = (String) CumminsIBAHelper.getAttributeValue(changeRecord, "PURPOSE");
+			purposeVal = purposeVal!=null ? purposeVal : "";
+			if(purposeVal.equalsIgnoreCase("Delink")){
+				isDelinked = true;
+			}
+		}catch (Exception ee) {
+			LOGGER.debug("Exception CumminsBeanHelper - isDelinkedPart() :" + ee);
+		}
+		return isDelinked;
+	}
+
+	
+	public static CumminsResultantObjectsBean partObjectFromResultantBean(String partNumber, List<CumminsResultantObjectsBean> resultantObjectsBeanList) {
+
+		try{	
+			if(resultantObjectsBeanList!=null) {
+				for(CumminsResultantObjectsBean resultantObjectBean : resultantObjectsBeanList) {
+					if(((resultantObjectBean.getResultantObject()).getNumber()).equalsIgnoreCase(partNumber)) {
+						return resultantObjectBean;
+					}
+				}
+			}		
+		}catch (Exception ee) {
+			LOGGER.debug("Exception CumminsBeanHelper - partObjectFromResultantBean() :" + ee);
+		}
+		return null;	
+	}
+	
+	public static WTPart getCompareVersion(WTPart wtPart, String viewName) {
+		WTPart sourcePart = wtPart;
+		try{
+	
+			WTPart partMfgObj = CumminsBOMUtility.findPart(sourcePart.getNumber(), viewName);
+			if(partMfgObj!=null) {
+				ArrayList<WTPart>partlist = CumminsValidatePlantItems.getAllVersionOfView(partMfgObj);			
+				for(WTPart mfgParts:partlist) {
+					WTPart enggPartEq=getLatestUpstreamEnggPart(mfgParts);
+					if(CumminsBOMUtility.compareVersions(enggPartEq.getVersionIdentifier().getValue(), sourcePart.getVersionIdentifier().getValue())<0) {
+						return enggPartEq;
+					}					
+				}
+			}			
+		}catch (Exception ee) {
+			LOGGER.debug("Exception CumminsBeanHelper - getPreviousVersion():  " + ee);
+		}
+		return sourcePart;
+	}
+	
+	
+	public static WTPart getLatestUpstreamEnggPart(WTPart wtPart) throws Exception {
+		WTPart equivalentEnggPart=null;
+		try{
+			QueryResult upstreamQR = WTAssociativityHelper.service.findUpstreamEquivalent(wtPart);
+			if(upstreamQR != null) {
+				equivalentEnggPart = CumminsValidatePlantItems.getLatestPartFromQR(upstreamQR, wtPart);	
+			}		
+		}catch (Exception ee) {
+			LOGGER.debug("Exception CumminsBeanHelper - getPreviousVersion():  " + ee);
+		}
+		return equivalentEnggPart;	
+	}
+	
+	 public static WTPart getLatestDownstreamManufPart(WTPart wtPart,String viewName) {
+		try{
+			LOGGER.debug("wtPart : "+wtPart.getDisplayIdentity());
+			QueryResult downstreamQR = WTAssociativityHelper.service.findDownstreamEquivalent(wtPart);
+			LOGGER.debug("getLatestDownstreamManufPart - downstreamQR:  " + downstreamQR);
+			while(downstreamQR.hasMoreElements()){
+				//downstreamQR.nextElement();
+				//equivalentManufPart = CumminsValidatePlantItems.getLatestPartFromQR(downstreamQR, wtPart);
+				WTPart equivalentManufPart=(WTPart) downstreamQR.nextElement();
+				LOGGER.debug("getLatestDownstreamManufPart - equivalentManufPart:  " + equivalentManufPart);
+
+				String partView = equivalentManufPart.getViewName();
+				LOGGER.debug("Downstream part: " + equivalentManufPart.getNumber() + 
+						 " | Raw View: [" + partView + "] | Expected: [" + viewName + "]" + 
+						 " | IsLatest: " + equivalentManufPart.isLatestIteration());
+				if(equivalentManufPart!=null && equivalentManufPart.getViewName().equalsIgnoreCase(viewName) && equivalentManufPart.isLatestIteration())
+				{
+					LOGGER.debug("return equivalentManufPart:  " + equivalentManufPart);
+					return equivalentManufPart;
+				}
+			}		
+		}catch (Exception ee) {
+			LOGGER.debug("Exception CumminsBeanHelper - getLatestDownstreamManufPart:  " + ee);
+			ee.printStackTrace();
+		}
+		return null;	
+	}
+	
+	//Modification for Action date
+
+	public static WTPart getLatestDownstreamManufPartForActionDate(WTPart wtPart, String viewName) {
+		try {
+			QueryResult downstreamQR = WTAssociativityHelper.service.findDownstreamEquivalent(wtPart);
+			Map<String, WTPart> wtPartList = new TreeMap<String, WTPart>();
+			LOGGER.debug(" getLatestDownstreamManufPart - downstreamQR:  " + downstreamQR);
+			while (downstreamQR.hasMoreElements()) {
+				WTPart equivalentManufPart = (WTPart) downstreamQR.nextElement();
+				LOGGER.debug("getLatestDownstreamManufPart - equivalentManufPart:  " + equivalentManufPart.getIdentity());
+				if (equivalentManufPart != null && equivalentManufPart.getViewName().equalsIgnoreCase(viewName)
+						&& equivalentManufPart.isLatestIteration()) {
+					wtPartList.put(equivalentManufPart.getVersionIdentifier().getValue(), equivalentManufPart);
+					LOGGER.debug("equivalentManufPart: " + equivalentManufPart.getIdentity());
+				}
+			}
+			if (!wtPartList.isEmpty()) {
+				LOGGER.debug("wtPartList Version:" + wtPartList.keySet());
+				Map.Entry<String, WTPart> firstEntry = ((TreeMap<String, WTPart>) wtPartList).firstEntry();
+				if(firstEntry != null) {
+					WTPart partObj = firstEntry.getValue();
+					LOGGER.debug("partObj: " + partObj.getIdentity());
+					return partObj;
+				}
+			}
+		} catch (Exception ee) {
+			LOGGER.debug("Exception CumminsBeanHelper - getLatestDownstreamManufPart:  " + ee);
+			ee.printStackTrace();
+		}
+		return null;
+	}
+	 
+	
+	public static WTPart getLatestDownstreamManufPartForActionDateForCurrentStatus(WTPart wtPart, String viewName) {
+		try {
+			QueryResult downstreamQR = WTAssociativityHelper.service.findDownstreamEquivalent(wtPart);
+			Map<String, WTPart> wtPartList = new TreeMap<String, WTPart>();
+			LOGGER.debug(" getLatestDownstreamManufPart - downstreamQR:  " + downstreamQR);
+			while (downstreamQR.hasMoreElements()) {
+				WTPart equivalentManufPart = (WTPart) downstreamQR.nextElement();
+				LOGGER.debug("getLatestDownstreamManufPart - equivalentManufPart:  " + equivalentManufPart);
+				if (equivalentManufPart != null && equivalentManufPart.getViewName().equalsIgnoreCase(viewName)
+						&& equivalentManufPart.isLatestIteration()) {
+					wtPartList.put(equivalentManufPart.getVersionIdentifier().getValue(), equivalentManufPart);
+				}
+			}
+			if (!wtPartList.isEmpty()) {
+				Map.Entry<String, WTPart> lastEntry = ((TreeMap<String, WTPart>) wtPartList).lastEntry();
+				if(lastEntry != null) {
+					WTPart partObj = lastEntry.getValue();
+					return partObj;
+				}
+			}
+		} catch (Exception ee) {
+			LOGGER.debug("Exception CumminsBeanHelper - getLatestDownstreamManufPart:  " + ee);
+			ee.printStackTrace();
+		}
+		return null;
+	}
+	
+	
+	
+	public static String getCompareVersionValue(WTPart sourcePart, WTPart preVersionPart) {
+		try {
+			if(!sourcePart.equals(preVersionPart)) {
+				return preVersionPart.getVersionIdentifier().getValue() + "." + preVersionPart.getIterationIdentifier().getValue() + " (" + preVersionPart.getViewName()+")";
+			}		
+
+		}catch (Exception ee) {
+			LOGGER.debug("Exception CumminsBeanHelper -  getCompareVersionValue():  " + ee);
+		}
+		return "";		
+	}
+	
+	
+	public static List<JSONObject> getDeltaChildPartsList(WTPart sourcePart, WTPart preVersionPart) {
+		List<JSONObject> listOfJsonObjects = new ArrayList<>();
+		try{		
+			preVersionPart.getIterationIdentifier();
+			Map<String, List<WTObject>> allPreviousChildren = CumminsValidatePlantItems.getAllChildList(preVersionPart);
+			Map<String, List<WTObject>> allCurrentChildren = CumminsValidatePlantItems.getAllChildList(sourcePart);
+			String attributes = CumminsPropertyHelper.getProperty("EMERGENCY_RELEASE_STRUCTURE_ATTRBUTES");
+			String deltaAttributes = CumminsPropertyHelper.getProperty("EMERGENCY_RELEASE_STRUCTURE_DELTA_ATTRBUTES");
+			List<String> listOfAllAttributes = Arrays.asList(attributes.split(InterfaceConstant.COMMA_CHAR));
+			List<String> comparisonAttributes = Arrays.asList(deltaAttributes.split(InterfaceConstant.COMMA_CHAR));
+			try {
+				listOfJsonObjects.addAll(StructureProcessor.compareStructure(allCurrentChildren, allPreviousChildren,
+						sourcePart, preVersionPart, listOfAllAttributes,comparisonAttributes,null));
+			} catch (JSONException e) {
+				LOGGER.error(e);
+			}
+		}catch(Exception e){
+			LOGGER.error("Exception CumminsBeanHelper - getDeltaChildPartsList(): "+e);
+		}
+		return listOfJsonObjects;	
+	}
+	
+	
+	public static List<JSONObject> getDeltaChildPartsListWithKit(WTPart sourcePart, WTPart preVersionPart) {
+		List<JSONObject> listOfJsonObjects = new ArrayList<>();
+		try{		
+			
+			Map<String, List<WTObject>> allPreviousChildren = CumminsValidatePlantItems.getAllChildList(preVersionPart);
+			Map<String, List<WTObject>> allCurrentChildren = CumminsValidatePlantItems.getAllChildList(sourcePart);
+			String attributes = CumminsPropertyHelper.getProperty("EMERGENCY_RELEASE_STRUCTURE_ATTRBUTES");
+			String deltaAttributes = CumminsPropertyHelper.getProperty("EMERGENCY_RELEASE_STRUCTURE_DELTA_ATTRBUTES_WITH_KIT");
+			List<String> listOfAllAttributes = Arrays.asList(attributes.split(InterfaceConstant.COMMA_CHAR));
+			List<String> comparisonAttributes = Arrays.asList(deltaAttributes.split(InterfaceConstant.COMMA_CHAR));
+			try {
+				listOfJsonObjects.addAll(StructureProcessor.compareStructure(allCurrentChildren, allPreviousChildren,
+						sourcePart, preVersionPart, listOfAllAttributes,comparisonAttributes,null));
+			} catch (JSONException e) {
+				LOGGER.error(e);
+			}
+		}catch(Exception e){
+			LOGGER.error("Exception CumminsBeanHelper - getDeltaChildPartsList(): "+e);
+		}
+		return listOfJsonObjects;	
+	}
+	
+	public static HashMap<String,String> getChangeTypeMap(List<JSONObject> listOfJsonObjects) {
+		HashMap<String,String> typeOfChange = new HashMap<String,String>();
+		String strChangeType = "";
+		try{			
+			for(JSONObject obj : listOfJsonObjects) {
+				String partNum=obj.get("childPartNumber").toString();
+				String changeType = obj.get(CumminsPlantConstantIF.TYPE_OF_CHANGE).toString();
+				//o: Removal/Omitted C: Change (Quantity) A:Addition
+				if(changeType.equals("C")) {
+					strChangeType = "Quantity Update";	
+					typeOfChange.put(partNum, strChangeType);
+				}
+				else if (changeType.equals("A")) {
+					strChangeType = "Added";
+					typeOfChange.put(partNum, strChangeType);
+				}
+				else if (changeType.equals("O")) {
+					strChangeType = "Removed";
+					typeOfChange.put(partNum, strChangeType);
+				}
+			}		
+		}catch(Exception e){
+			LOGGER.error("Exception CumminsBeanHelper - getDeltaChildPartsList():  "+e);
+		}
+		return typeOfChange;
+	}
+	
+	
+	
+	// Modified for STOR-1076 Start
+	public static String getPlantImpact(WTPart part, String plantView, HashMap<String, List<JSONObject>> plantDetailsMap) {
+		String plantImpact = " ";
+		try {
+			//Modified
+			if(plantDetailsMap.containsKey(plantView)) {
+				List<JSONObject> plantObject=plantDetailsMap.get(plantView);
+				List<JSONObject> activeItems = plantObject.stream().filter(jsonObject -> jsonObject.has("Active")).collect(Collectors.toList());
+				for(JSONObject jsonobj : activeItems) {
+					MPMPartToPlantAssignmentLink mpmLink = (MPMPartToPlantAssignmentLink) jsonobj.get("Active");
+					Object plantImpactObj = mpmLink != null
+								? CumminsIBAHelper.getAttributeValue(mpmLink, "MFG_RECOMMANDATION")
+								: null;
+					plantImpact = plantImpactObj != null ? plantImpactObj.toString() : "";
+				}
+			}
+			
+		} catch (Exception e) {
+			LOGGER.debug("Exception in <<getPlantImpact()>>" + e);
+		}
+		return plantImpact;
+	}
+		
+	public static String getPlantAvailability(WTPart part, String plantView, HashMap<String, List<JSONObject>> plantDetailsMap) {
+		String existsinPlant = "";
+		try {
+			//Modified removed
+			//HashMap<String, List<JSONObject>> plantDetailsMap = CumminsPlantHelper.getAssignedPlantDetails(part);
+			if(plantDetailsMap.containsKey(plantView)) {
+				List<JSONObject> plantObject=plantDetailsMap.get(plantView);
+				if (plantObject.toString().contains("Rejected") && !plantObject.toString().contains("Active") && !plantObject.toString().contains("Delinked")) {
+					return "Rejected";
+				}
+				if(plantObject.toString().contains("Active")) {
+					for(JSONObject jsonobj : plantObject) {
+						if(jsonobj.toString().contains("Active"))
+						{
+							String rejectPlantValue = (String) CumminsIBAHelper.getAttributeValue(
+									(MPMPartToPlantAssignmentLink) jsonobj.get("Active"), CumminsPlantConstantIF.REJECT_PLANT_MARKING_IBA);
+							if(rejectPlantValue!=null && !rejectPlantValue.isEmpty() && rejectPlantValue.equalsIgnoreCase(CumminsPlantConstantIF.RPM_PENDING_REJECTED) ) {
+								//Code to set Rejected for Pending Rejected Case
+								//Commented to fix bug WZ-2175
+								//return "Rejected";
+							}else {
+								WTPart mpart=CumminsBOMUtility.findPart(part.getNumber(), plantView);
+								if(mpart==null) {
+									if((plantObject.toString().contains("Rejected"))) {										
+										return "Rejected";
+									}									
+								}
+							}
+						}
+					}
+					
+				}
+			}
+			WTPart mpart=CumminsBOMUtility.findPart(part.getNumber(), plantView);
+			if(mpart!=null) {
+			Object plantStatus=CumminsIBAHelper.getAttributeValue(mpart,CumminsPartConstantIF.PLANT_STATUS_IBA);
+			return plantStatus!=null?plantStatus.toString():existsinPlant;
+			}
+		} catch (Exception e) {
+			LOGGER.debug("Exception in <<getPlantAvailability()>>" + e);
+		}
+		return existsinPlant;
+	}
+	// Modified for STOR-1076 End
+	
+	//Modified
+	public static String getDelinkStatus(String plantView, HashMap<String, List<JSONObject>> plantDetailsMap) {
+		String delinkPlant = "";
+		try {
+			if(plantDetailsMap.containsKey(plantView)) {
+				List<JSONObject> plantObject=plantDetailsMap.get(plantView);
+				if (plantObject.toString().contains("Delinked") && !plantObject.toString().contains("Active")) {
+					return "Delinked";
+				}
+			}
+		}catch (Exception e) {
+				LOGGER.debug("Exception in <<getPlantAvailability()>>" + e);
+			}
+		return delinkPlant;
+		}
+	
+	//Modifcation for STOR-1639 To handle pending rejected
+	public static boolean getPendingRejectStatus(WTPart part, String plantView) {
+		boolean valueUpdate=false;
+		try {
+			WTPart enggPart = CumminsBOMUtility.findPart(((WTPart) part).getNumber(),CumminsPartConstantIF.ENGINEERING );
+			//String mcaPlantName=PropertiesReader.getPropertyValue(plantView.replaceAll(" ", "_")).replaceAll(" ", "_");
+			if(enggPart!=null) {
+				MPMPlant plant = CumminsPlantHelper.getPlantbyName(plantView);
+				 MPMPartToPlantAssignmentLink  mpmLink=CumminsPlantHelper.getActivePlantLinkbetweenPartandPlant(enggPart,plant); 
+				 if(mpmLink!=null){
+					String rejectPlantValue = (String) CumminsIBAHelper.getAttributeValue(
+							mpmLink, CumminsPlantConstantIF.REJECT_PLANT_MARKING_IBA);
+					if(!rejectPlantValue.isEmpty() && rejectPlantValue.equalsIgnoreCase(CumminsPlantConstantIF.RPM_PENDING_REJECTED) ) {
+						valueUpdate=true;
+					}
+				 }
+			}
+		}
+		catch(Exception e){
+			LOGGER.debug("Update value"+e);
+		}
+		return valueUpdate;
+	}
+	
+	//STOR-1078 modification Start
+			public static String getSourceValue(WTPart sourcePart, String viewName, HashMap<String, List<JSONObject>> plantDetailsMap) {
+				LOGGER.debug(" CumminsBeanHelper: Entering to getSourceValue() ");
+				String Output="";
+				try{	
+					WTPart partMfgObj = CumminsBOMUtility.findPart(sourcePart.getNumber(), viewName);					
+					if(partMfgObj != null) {						
+						WTPart correspondingMfg = getLatestDownstreamManufPart(sourcePart,viewName);						
+						if(correspondingMfg!=null)
+						{	
+							Object value=CumminsIBAHelper.getAttributeValue(correspondingMfg,CumminsPartConstantIF.SOURCE_IBA);
+							LOGGER.debug("get sourcevalue of Equivalent mfg part: "+value.toString());							
+							return value!=null?value.toString():"";
+						}
+						else
+						{							
+							Object value=CumminsIBAHelper.getAttributeValue(partMfgObj,CumminsPartConstantIF.SOURCE_IBA );
+							LOGGER.debug("get sourcevalue of latest mfg part: "+value.toString());
+							return value!=null?value.toString():"";
+						}
+						
+					}
+					else{
+						//Modified
+						MPMPartToPlantAssignmentLink mpmLink  = null;
+						if(plantDetailsMap.containsKey(viewName)) {
+							List<JSONObject> plantObject=plantDetailsMap.get(viewName);
+							if(plantObject.toString().contains("Active")) {
+								List<JSONObject> activeItems = plantObject.stream().filter(jsonObject -> jsonObject.has("Active")).collect(Collectors.toList());
+								for(JSONObject jsonobj : activeItems) {
+									mpmLink = (MPMPartToPlantAssignmentLink) jsonobj.get("Active");
+								}
+								
+							}
+						}
+						Object value=mpmLink!=null?CumminsIBAHelper.getAttributeValue(mpmLink,CumminsPlantConstantIF.MFG_RECOMMANDATION):null;
+						if (value!=null) 
+						{							
+							return value!=null?value.toString():"";
+						}
+					    else
+					    {
+					    	String partType=TypeIdentifierUtility.getTypeIdentifier(sourcePart).getTypeInternalName();					    	
+					    	return CumminsPropertyHelper.getProperty("CumminsBeanHelper"+partType, "");
+					    	
+						}
+					}			
+				}catch (Exception ee) {
+					LOGGER.debug("Exception CumminsBeanHelper - getPreviousVersion():  " + ee);
+				}
+				LOGGER.debug("CumminsBeanHelper: End getSourceValue()");
+				return Output;
+				}
+			//STOR-1078 modification End
+			
+			
+	/**
+	 * Create or revise part
+	 * 
+	 * @param parenteam
+	 * 
+	 * @param wtPart         : WTPart
+	 * @param targetPartList : List<WTPart>
+	 * @param targetViewStr  : String
+	 * @return String
+	 * @throws WTException the WT exception
+	 */
+	public static WTPart partCreateOrReviseInTargetView(WTPart sourcePart, MPMPlant plant, String source,String cnNumber,List<String> sourceUpdatedPartsList) {
+		WTPart returnPart = null;
+		
+		try {
+			LOGGER.debug("In CumminsBeanHelper - partCreateOrReviseInTargetView()");
+			if (plant == null || sourcePart == null) {
+				return null;
+			}
+
+			String strTargetView = plant.getName(); 
+			WTPart mPart = CumminsBOMUtility.findPart(sourcePart.getNumber(), strTargetView);
+			MPMPartToPlantAssignmentLink mpmLink = CumminsPlantHelper.getActivePlantLinkbetweenPartandPlant(sourcePart,
+					plant);
+			if (mPart == null) {
+				try {
+					if (mpmLink == null) {
+						if(source.equals("")) {
+							source=(String) CumminsIBAHelper.getAttributeValue(sourcePart, "source");
+							source=getDisplayNameFromSource(source);
+						}
+						CumminsPlantHelper.createWTPartPlantLink(sourcePart, plant, false, cnNumber, source, true);
+					}
+				} catch (Exception ex) {
+					LOGGER.error(
+							"Exception in CumminsBeanHelper - CreatePartPlantlink for delinked part without Mfg view"
+									+ ex);
+				}
+				returnPart = CumminsCopyBOM.createNewPlantViewPart(sourcePart, strTargetView);
+				if(returnPart!=null)
+				{
+					String organizationName = returnPart.getOrganizationName();
+					if(CumminsUtils.isMDEOrganization(organizationName) && !strTargetView.equals("NRP_PBS"))
+					{
+						CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+								CumminsPartConstantIF.PLANT_STATUS_IBA, "Pending");
+					}
+					//Modified for WZ-55 Start
+					CumminsCopyBOM.updateAttrEquEngRev(sourcePart, returnPart);
+					//Modified for WZ-55 End
+				}
+				if (sourcePart != null) {
+					//updating source value on the link if it is different from plant Impact
+					MPMPartToPlantAssignmentLink plantLink=CumminsPlantHelper.getActivePlantLinkbetweenPartandPlant(sourcePart,plant);
+					String plantSource = "";
+					if(plantLink!=null) {
+				    	plantSource=(String) getMPMPlantLinkAttributesForActivePlants(plantLink,CumminsPlantConstantIF.MFG_RECOMMANDATION);
+					}
+				    if(source !=null && !source.equals("") && !plantSource.equalsIgnoreCase(source)){
+				    	plantSource = source;
+				    	CumminsPlantHelper.setUpdateIBAValue(mpmLink, CumminsPlantConstantIF.MFG_RECOMMANDATION, plantSource);
+				    	sourceUpdatedPartsList.add(sourcePart.getNumber());
+				    	LOGGER.debug("Source Updated List - BeanHelper File - {}",sourceUpdatedPartsList);
+				    	 
+				    }
+					if (plantSource.equals("Make")) {
+						CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+								CumminsPartConstantIF.SOURCE_IBA, "make");
+					} else if (plantSource.equals("Buy")) {
+						CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+								CumminsPartConstantIF.SOURCE_IBA, "buy");
+					} else if (plantSource.equals("General")) {
+						CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+								CumminsPartConstantIF.SOURCE_IBA, "general");
+					} else if (plantSource.equals("Use from other plant")) {
+						CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+								CumminsPartConstantIF.SOURCE_IBA, "user");
+					} else if (plantSource.equals("Future")) {
+						CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+								CumminsPartConstantIF.SOURCE_IBA, "future");
+					} else if (plantSource.isEmpty() && strTargetView.equals("NRP_PBS")) {
+						CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+								CumminsPartConstantIF.SOURCE_IBA, "future");
+					}
+					String orgName = sourcePart.getOrganizationName();
+					try {
+						if (strTargetView.equals("NRP_PBS")) {
+							if (plantSource.equals("Make") || plantSource.equals("Buy")) {
+								CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart, "Part_Size",
+										"standard");
+								if (!orgName.equals(CumminsConstantIF.POWERSYSTEMS)) {
+									CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+											"SUPER_FAMILY_CODE", "1");
+									CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+											"MAKE_TO_ORDER", "No");
+									returnPart = CumminsBOMUtility.findPart(returnPart.getNumber(),
+											returnPart.getViewName());
+								}
+							}
+						}
+					} catch (Exception e) {
+						LOGGER.error("Exception caught While updating NRP_PBS Attribute" + e);
+					}
+				}
+				List<MPMPlant> mpmplanttopart = CumminsPlantHelper.getMPMPlantByPart(returnPart);
+				for (MPMPlant mpmplant : mpmplanttopart) {
+					CumminsPlantHelper.removeWTPartPlantLink(returnPart, mpmplant, false, false);
+				}
+
+				return returnPart;
+			} else {
+				//returnPart = revisePlantViewPart(mPart, sourcePart);
+				//Modified for STOR-1318 Start
+				LOGGER.debug("mPart: " + mPart.getIdentity());
+				boolean isDelink = false;
+				isDelink = CumminsValidatePlantItems.isChildDelinked(sourcePart,plant);
+				if(isDelink) {
+					CumminsPlantHelper.createWTPartPlantLink(sourcePart, plant, false, cnNumber, source, true);
+				}
+				WTPart latestSourcePart = CumminsBOMUtility.findPart(sourcePart.getNumber(), CumminsPartConstantIF.ENGINEERING);
+				if(latestSourcePart!=null && !latestSourcePart.equals(sourcePart) && !isDelink)
+				{
+				WTPart eqMfgPart=CumminsBeanHelper.getLatestDownstreamManufPartForActionDate(sourcePart, strTargetView);
+				if(eqMfgPart!=null)
+				{
+					mPart = eqMfgPart;
+					LOGGER.debug("mPart: " + mPart.getIdentity());
+				}
+				}
+				returnPart = revisePlantViewPart(mPart, sourcePart,isDelink);
+				if(returnPart!=null)
+				{
+					String organizationName = returnPart.getOrganizationName();
+					if(CumminsUtils.isMDEOrganization(organizationName) && !strTargetView.equals("NRP_PBS"))
+					{
+						Object value=CumminsIBAHelper.getAttributeValue(returnPart,CumminsPartConstantIF.PLANT_STATUS_IBA);							
+						String val=value!=null?value.toString():"";
+						if(val==null||val.isEmpty()||val.equals("Delinked"))
+						{
+							CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+								CumminsPartConstantIF.PLANT_STATUS_IBA, "Pending");
+						}
+					}
+					//Modified for WZ-55 Start
+					CumminsCopyBOM.updateAttrEquEngRev(sourcePart, returnPart);
+					//Modified for WZ-55 End
+				}
+				//Modified for STOR-1318 End
+				MPMPlant partplantView = CumminsBOMUtility.getMPMPlant(strTargetView);
+				boolean isSourceUpdated = false;
+				if (sourcePart != null) {
+					//updating source value on the link if it is different from plant Impact
+					MPMPartToPlantAssignmentLink plantLink=CumminsPlantHelper.getActivePlantLinkbetweenPartandPlant(sourcePart,plant);
+				    String plantSource = "";
+				    if(plantLink!=null) {
+				    	plantSource=(String) getMPMPlantLinkAttributesForActivePlants(plantLink,CumminsPlantConstantIF.MFG_RECOMMANDATION);
+				    }
+				    if(source!=null &&!source.equals("")&&!plantSource.equalsIgnoreCase(source)){
+				    	plantSource = source;
+						CumminsPlantHelper.setUpdateIBAValue(plantLink, CumminsPlantConstantIF.MFG_RECOMMANDATION, source);
+				    	//CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(plantLink, CumminsPlantConstantIF.MFG_RECOMMANDATION, source);
+						isSourceUpdated = true;
+						sourceUpdatedPartsList.add(sourcePart.getNumber());
+						LOGGER.debug("Source Updated List - BeanHelper File - {}",sourceUpdatedPartsList);
+						 
+				    } else if(isDelink) {
+				    	Object value = CumminsIBAHelper.getAttributeValue(returnPart,CumminsPartConstantIF.SOURCE_IBA);
+				    	LOGGER.debug("get sourcevalue of mfg part: " + value.toString());							
+				    	String sourceMfgPart = value!=null?value.toString():"";
+				    	LOGGER.debug("Mfg Part Source: " + getDisplayNameFromSource(sourceMfgPart) + ", Plant Impact (Source): " + source);
+				    	if(source!=null && !source.equals("") && !sourceMfgPart.isEmpty() && !getDisplayNameFromSource(sourceMfgPart).equals(source)) {
+				    		plantSource = source;
+				    		isSourceUpdated = true;
+				    		sourceUpdatedPartsList.add(sourcePart.getNumber());
+				    		LOGGER.debug("Source Updated List - BeanHelper File -",sourceUpdatedPartsList);
+				    	}
+				    }
+					if (plantSource.equals("Make")) {
+						returnPart = createNewIterationWithChange(returnPart,isSourceUpdated);
+						if(isSourceUpdated) {
+							CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+								CumminsPartConstantIF.SOURCE_IBA, "make");
+						}
+					} else if (plantSource.equals("Buy")) {
+						returnPart = createNewIterationWithChange(returnPart,isSourceUpdated);
+						if(isSourceUpdated) {
+							CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+								CumminsPartConstantIF.SOURCE_IBA, "buy");
+						}
+					} else if (plantSource.equals("General")) {
+						returnPart = createNewIterationWithChange(returnPart,isSourceUpdated);
+						if(isSourceUpdated) {
+							CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+								CumminsPartConstantIF.SOURCE_IBA, "general");
+						}
+					} else if (plantSource.equals("Use from other plant")) {
+						returnPart = createNewIterationWithChange(returnPart,isSourceUpdated);
+						if(isSourceUpdated) {
+							CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+								CumminsPartConstantIF.SOURCE_IBA, "user");
+						}
+					} else if (plantSource.equals("Future")) {
+						returnPart = createNewIterationWithChange(returnPart,isSourceUpdated);
+						if(isSourceUpdated) {
+							CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(returnPart,
+								CumminsPartConstantIF.SOURCE_IBA, "future");
+						}
+					}
+				}
+				List<MPMPlant> mpmplanttopart = CumminsPlantHelper.getMPMPlantByPart(returnPart);
+				for (MPMPlant mpmplant : mpmplanttopart) {
+					CumminsPlantHelper.removeWTPartPlantLink(returnPart, mpmplant, false, false);
+				}
+				if (returnPart != null) {
+					try {
+						CumminsPlantHelper.updateUsedInPlant(sourcePart,
+								CumminsPlantHelper.getPlantbyName(returnPart.getViewName()));
+					} catch (Exception e) {
+						LOGGER.error("Error while Updating Usage Plant Attribute ", e);
+					}
+				}
+			}
+		}
+catch (Exception ee) {
+			LOGGER.debug("Exception CumminsBeanHelper - partCreateOrReviseInTargetView() :" + sourcePart.getNumber() + "--"
+					+ ee);
+		}
+		return returnPart;
+	}
+
+	
+	public static String getDisplayNameFromSource(String source) {
+		HashMap<String,String> sourceMap = new HashMap<String,String>();
+		sourceMap.put("make","Make"); 
+		sourceMap.put("buy","Buy");   
+		sourceMap.put("general","General"); 
+		sourceMap.put("user","Use from other plant");
+		sourceMap.put("future","Future");
+		
+		return sourceMap.get(source);
+			}
+
+	public static Object getMPMPlantLinkAttributesForActivePlants(MPMPartToPlantAssignmentLink plantLink,
+			String internalName) throws RemoteException {
+		Object value = null;
+		try {
+			Object valueObject = CumminsIBAHelper.getAttributeValue(plantLink, internalName);
+			value = valueObject != null ? valueObject : value;
+			return value;
+		} catch (WTException e) {
+			LOGGER.error("WTException cought at getMPMPlantByPart(part)" + e.getLocalizedMessage(), e);
+		}
+		return value;
+	}
+
+	/**
+	 * Revise the part version to new revision
+	 * 
+	 * @param targetPart : WTPart
+	 * @return WTPart
+	 * @throws WTException the WT exception
+	 */
+	@SuppressWarnings({ "deprecation", "unchecked" })
+		public static WTPart revisePlantViewPart(WTPart targetPart, WTPart sourcePart, boolean isDelink) throws WTException, Exception {
+		LOGGER.debug("In CumminsBeanHelper  <<revisePlantViewPart()>> : START");
+		Map sharedMap = null;
+		WTPart revisedPart = null;
+		try {
+			if (targetPart == null) {
+				return revisedPart;
+			}
+			if (sourcePart == null) {
+				sourcePart = CumminsBOMUtility.findPart(targetPart.getNumber(), CumminsPartConstantIF.ENGINEERING);
+			}
+			//Modified for STOR-1318 - isDelink
+			if (CumminsBOMUtility.checkEquivalenceLinkExists(sourcePart, targetPart) && !isDelink) {
+				LOGGER.debug("Equivalence link Exists for the part Updating attributes for" + sourcePart.getNumber());
+				if(targetPart.getState().getState().equals(CumminsState.RELEASED) || targetPart.getState().getState().equals(CumminsState.PENDING_OBSOLETE)
+						|| targetPart.getState().getState().equals(CumminsState.LIMITED_USAGE) || targetPart.getState().getState().equals(CumminsState.OBSOLETE)) {
+					// Do nothing..
+					
+				}else {
+				revisedPart = CumminsCopyBOM.updateAttributesOnRevise(sourcePart, targetPart);
+				LOGGER.debug(
+						"Equivalence link Exists for the part Updating attributes Success" + sourcePart.getNumber());
+				return revisedPart;
+				}
+				
+			}
+			LOGGER.debug("Trying to revise the part as part: " + targetPart.getVersionIdentifier().getValue() + "."
+					+ targetPart.getIterationIdentifier().getValue() + " (" + targetPart.getViewName() + ")");
+
+			if (WorkInProgressHelper.isCheckedOut(targetPart)) {
+				throw new Exception(" Part is checked-out.");
+			} else {
+				sharedMap = (Transaction.getCurrentTransaction() != null)
+						&& (Transaction.getCurrentTransaction().isShared()) ? Transaction.getSharedMap()
+								: Transaction.getGlobalMap();
+				sharedMap.put("IgnoreReviseTransition", true);
+
+				// logic to revise a target part
+				revisedPart = (WTPart) VersionControlHelper.service.newVersion(targetPart);
+				VersionIdentifier vi = CumminsCopyBOM.getVersionIdentifier(sourcePart);
+				try {
+					VersionControlHelper.setVersionIdentifier(revisedPart, vi, true);
+				} catch (VersionControlException ee) {
+					LOGGER.debug("VersionControlException for Part" + targetPart.getNumber() + ee);
+				}
+				revisedPart = (WTPart) PersistenceHelper.manager.save(revisedPart);
+				if (sourcePart.getViewName().equals(CumminsPartConstantIF.ENGINEERING)) {
+
+					// Create link only when upStream part Exist
+					//WZ-917
+					createEquivalenceLink(sourcePart, revisedPart);
+				}
+				// update attributes form engineering part
+				LOGGER.debug("Equivalence link created newly" + sourcePart.getNumber());
+				revisedPart = CumminsCopyBOM.updateAttributesOnRevise(sourcePart, revisedPart);
+
+			}
+			LOGGER.debug("Revised part is : " + revisedPart.getVersionIdentifier().getValue() + "."
+					+ revisedPart.getIterationIdentifier().getValue() + " (" + revisedPart.getViewName() + ")");
+			return revisedPart;
+		} catch (Exception ee) {
+			LOGGER.debug("Exception caught on Revise Part" + ee);
+			throw new WTException(ee);
+		} finally {
+			if (sharedMap != null) {
+				sharedMap.remove("IgnoreReviseTransition");
+			}
+		}
+	}
+
+	public static WTPart restructureBOMForMake(WTPart upStreamPart, WTPart downStreamPart)
+			throws WTPropertyVetoException, WTException {
+		String strTargetView = downStreamPart.getViewName();
+		List<CumminsMBOMItemListBean> targetMBOMBeanList = new ArrayList<CumminsMBOMItemListBean>();
+		List<String> manfPartChildsList = new ArrayList<String>();
+		ArrayList<String> sPartNumList = new ArrayList<String>();
+		List<CumminsBOMItemListBean> bomBeanList = CumminsBOMUtility.getFirstLevelBOMStructure(upStreamPart,
+				upStreamPart.getViewName());
+		for (CumminsBOMItemListBean bomBean : bomBeanList) {
+			WTPart sourcePart = bomBean.getUsesPart();
+			sPartNumList.add(sourcePart.getNumber());
+		}
+		try {
+			targetMBOMBeanList = downStreamPart != null
+					? CumminsBOMUtility.getFirstLevelChildsMBOMStructure(downStreamPart, downStreamPart.getViewName())
+					: targetMBOMBeanList;
+			ArrayList<String> targetPartNumberList = removeLinkAndCollectPartNumber(targetMBOMBeanList, sPartNumList);
+			manfPartChildsList = downStreamPart != null
+					? getFirstLevelStructureWithOnlyManfPart(downStreamPart, downStreamPart.getViewName())
+					: manfPartChildsList;
+
+			if (bomBeanList == null || strTargetView == null ) {
+				return downStreamPart;
+			}
+			Workable workable = null;
+			/*if (bomBeanList.isEmpty()) {
+				workable = GenericObjectService.checkout(downStreamPart);
+				if (WorkInProgressHelper.isCheckedOut(workable)) {
+					downStreamPart = (WTPart) WorkInProgressHelper.service.checkin(workable,
+							"Checkin Performed by System after updating part details");
+				}
+			}*/
+			workable = null;
+			for (CumminsBOMItemListBean sourceBeanObj : bomBeanList) {
+				WTPart sUsesPart = CumminsUtils.getLatestReleasedPart(sourceBeanObj.getUsesPart().getMaster(),
+						sourceBeanObj.getUsesPart().getView());
+				WTPart tUsesPart = CumminsBOMUtility.findPart(sUsesPart.getNumber(), strTargetView);
+				WTPart sUsedByPart = sourceBeanObj.getUsedByPart();
+				WTPart tUsedByPart = CumminsBOMUtility.findPart(sUsedByPart.getNumber(), strTargetView);
+				if(tUsedByPart!=null && downStreamPart!=null && tUsedByPart.getNumber().equalsIgnoreCase(downStreamPart.getNumber()))
+				{
+					tUsedByPart=downStreamPart;
+				}
+				WTPartUsageLink targetPartUsagelink = null;
+				if (manfPartChildsList.contains(sUsesPart.getNumber())
+						&& !targetPartNumberList.contains(sUsesPart.getNumber())) {
+					// nothing to do as the part was present only inside Phantom/Manufacturing part
+				} else {
+					if (!targetPartNumberList.contains(sUsesPart.getNumber())) {
+						if (tUsesPart != null) {
+							workable = workable == null ? GenericObjectService.checkout(tUsedByPart) : workable;
+							targetPartUsagelink = CumminsCopyBOM.linkTargetParts(workable, tUsesPart,
+									sourceBeanObj.getUsageLink());
+						}
+					} else {
+						if (tUsesPart != null) {
+							workable = workable == null ? GenericObjectService.checkout(tUsedByPart) : workable;
+							targetPartUsagelink = GenericObjectService.getPartUsageLink((WTPart) workable,
+									tUsesPart.getMaster());
+						}
+					}
+					/* Defect 208592 -Missing substitute part */
+					if (sourceBeanObj.getUsesSubstitutePart() != null
+							&& sourceBeanObj.getUsesSubstitutePart().size() > 0) {
+						workable = updateWTPartSubstituteLink(sourceBeanObj.getUsageLink(), targetPartUsagelink,
+								sUsesPart.getViewName(), sUsedByPart, tUsedByPart, tUsesPart, workable);
+					}
+
+					if (targetPartUsagelink != null) {
+						// Update Usage link attribute
+						String org = sourceBeanObj.getUsesPart().getOrganizationName()
+								.replace(CumminsPartConstantIF.SPACE, CumminsPartConstantIF.UNDERSCORE).toLowerCase();
+						Map<String, String> partBomMap = (Map<String, String>) CumminsCopyBOM
+								.getAttributeList(EBOMTOMBOM, org);
+						workable = workable == null ? GenericObjectService.checkout(tUsedByPart) : workable;
+						ArrayList<String> loadStr = new ArrayList<String>((partBomMap.keySet()));
+						PersistableAdapter obj = new PersistableAdapter((Persistable) targetPartUsagelink, null,
+								Locale.US, null);
+						obj.load(loadStr);
+						for (Entry<String, String> attributeInternalName : partBomMap.entrySet()) {
+							String attributebomName = attributeInternalName.getKey();
+							Object sourceObject = CumminsIBAHelper.getAttributeValue(sourceBeanObj.getUsageLink(),
+									attributebomName);
+
+							if (sourceObject != null) {
+								if (attributebomName.equals(CumminsPartConstantIF.METHOD_OF_USE)) {
+									sourceObject = sourceObject instanceof Object[] ? ((Object[]) sourceObject)[0]
+											: sourceObject;
+								}
+								if (attributebomName.equals(CumminsPartConstantIF.QUANTITY)) {
+									Object previousQuantityObject = "";
+									WTPart previousRevisionParentPart = (WTPart) InterfaceExecutionHelper
+											.getPreviousReleasedOrLimitedRevisionObject(sUsedByPart);
+									if (previousRevisionParentPart != null) {
+										Map<String, List<WTObject>> allPreviousChildren = getAllChildList(
+												previousRevisionParentPart);
+										for (Map.Entry<String, List<WTObject>> entryObject : allPreviousChildren
+												.entrySet()) {
+											String partNumber = entryObject.getKey();
+											if (partNumber.equals(sUsesPart.getNumber())) {
+												List<WTObject> partAndPartUsageLink = entryObject.getValue();
+												WTObject partUsageLink = partAndPartUsageLink.get(1);
+
+												previousQuantityObject = CumminsIBAHelper
+														.getAttributeValue(partUsageLink, attributebomName);
+
+												if (!(previousQuantityObject.equals(sourceObject))) {
+													obj.set(attributebomName, sourceObject);
+												}
+											}
+										}
+									} else {
+										obj.set(attributebomName, sourceObject);
+									}
+								} else {
+									obj.set(attributebomName, sourceObject);
+								}
+							}
+						}
+						obj.apply();
+						PersistenceHelper.manager.modify(targetPartUsagelink);
+
+					}
+				}
+			}
+			for(CumminsMBOMItemListBean listBean:targetMBOMBeanList) {
+				if(listBean.getUsesPart().getViewName().equals(CumminsPartConstantIF.ENGINEERING)) {
+					if(CumminsBOMUtility.findPart(listBean.getUsesPart().getNumber(),strTargetView)==null){
+						downStreamPart  = (WTPart) VersionControlHelper.service.getLatestIteration(downStreamPart, false);
+						workable = workable == null ? GenericObjectService.checkout(downStreamPart) : workable;
+						WTPartUsageLink targetPartUsagelink = GenericObjectService.getPartUsageLink((WTPart) workable,listBean.getUsesPart().getMaster());
+						if(targetPartUsagelink!=null) {
+							PersistenceHelper.manager.delete(targetPartUsagelink);
+						}
+					}
+				}
+			}
+			for (CumminsMBOMItemListBean mbomBean : targetMBOMBeanList) {
+				if (!sPartNumList.contains(mbomBean.getUsesPart().getNumber()) && (CumminsBOMUtility.findPart(mbomBean.getUsesPart().getNumber(),"Engineering")!=null)) {
+					downStreamPart  = (WTPart) VersionControlHelper.service.getLatestIteration(downStreamPart, false);
+					WTPartUsageLink targetPartUsagelink = GenericObjectService.getPartUsageLink((WTPart) workable,mbomBean.getUsesPart().getMaster());
+					if(targetPartUsagelink!=null) {
+						workable = workable == null ? GenericObjectService.checkout(downStreamPart) : workable;
+						PersistenceHelper.manager.delete(targetPartUsagelink);
+					}
+				}
+			}
+			if (workable != null && WorkInProgressHelper.isWorkingCopy(workable)) {
+				try {
+
+					downStreamPart = (WTPart) WorkInProgressHelper.service.checkin(workable,
+							"Checkin Performed by System after updating part details");
+
+				} catch (Exception e) {
+
+					downStreamPart = (WTPart) WorkInProgressHelper.service.undoCheckout(workable);
+					LOGGER.error("Exception caught while doing Checkin" + e);
+				}
+			}
+		} catch (Exception e) {
+			LOGGER.error("Error in CumminsBeanHelper", e);
+			if (e.toString().contains("Item Relationship")) {
+				throw new WTException(e);
+			}
+		}
+
+		return downStreamPart;
+	}
+
+	
+	public static WTPart restructureBOMForOthers(WTPart upStreamPart, WTPart downStreamPart,GraphNode graphNodeObj)
+			throws WTPropertyVetoException, WTException {
+		if(downStreamPart!=null) {
+		String strTargetView = downStreamPart.getViewName();
+		List<CumminsMBOMItemListBean> targetMBOMBeanList = new ArrayList<CumminsMBOMItemListBean>();
+		List<String> manfPartChildsList = new ArrayList<String>();
+		ArrayList<String> sPartNumList = new ArrayList<String>();
+		List<CumminsBOMItemListBean> bomBeanList = CumminsBOMUtility.getFirstLevelBOMStructure(upStreamPart,
+				upStreamPart.getViewName());
+		
+		List<GraphNode> graphChild=graphNodeObj.getChildren();
+		// Performance Improvement Update Start
+		if(graphChild!=null && !graphChild.isEmpty() ) {
+		bomBeanList = bomBeanList.stream()
+	            .filter(bomBean -> graphChild.stream()
+	                .anyMatch(graphNode -> graphNode.getUsedPartNumber().equals(bomBean.getUsesPart().getNumber())))
+	            .collect(Collectors.toList());
+		}
+		// Performance Improvement Update End
+		
+		for (CumminsBOMItemListBean bomBean : bomBeanList) {
+			WTPart sourcePart = bomBean.getUsesPart();
+			sPartNumList.add(sourcePart.getNumber());
+		}
+		try {
+			targetMBOMBeanList = downStreamPart != null
+					? CumminsBOMUtility.getFirstLevelChildsMBOMStructure(downStreamPart, downStreamPart.getViewName())
+					: targetMBOMBeanList;
+			ArrayList<String> targetPartNumberList = removeLinkAndCollectPartNumber(targetMBOMBeanList, sPartNumList);
+			manfPartChildsList = downStreamPart != null
+					? getFirstLevelStructureWithOnlyManfPart(downStreamPart, downStreamPart.getViewName())
+					: manfPartChildsList;
+
+			if (bomBeanList == null || strTargetView == null ) {
+				return downStreamPart;
+			}
+			Workable workable = null;
+			
+			for (CumminsBOMItemListBean sourceBeanObj : bomBeanList) {
+				GraphNode graphFound = graphChild.stream()
+				        .filter(node -> node.usedPartNumber.equals(sourceBeanObj.getUsesPart().getNumber()))
+				        .findFirst()
+				        .orElse(null);
+				WTPart sUsesPart = CumminsUtils.getLatestReleasedPart(sourceBeanObj.getUsesPart().getMaster(),
+						sourceBeanObj.getUsesPart().getView());
+				WTPart tUsesPart = CumminsBOMUtility.findPart(sUsesPart.getNumber(), strTargetView);
+				WTPart sUsedByPart = sourceBeanObj.getUsedByPart();
+				WTPart tUsedByPart = CumminsBOMUtility.findPart(sUsedByPart.getNumber(), strTargetView);
+				if(tUsedByPart!=null && downStreamPart!=null && tUsedByPart.getNumber().equalsIgnoreCase(downStreamPart.getNumber()))
+				{
+					tUsedByPart=downStreamPart;
+				}
+				WTPartUsageLink targetPartUsagelink = null;
+				if(graphFound!=null && graphFound.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("Yes")) {
+					if (manfPartChildsList.contains(sUsesPart.getNumber())
+							&& !targetPartNumberList.contains(sUsesPart.getNumber())) {
+						// nothing to do as the part was present only inside Phantom/Manufacturing part
+						} 
+					else {
+						if (!targetPartNumberList.contains(sUsesPart.getNumber())) {
+							if (tUsesPart != null) {
+								workable = workable == null ? GenericObjectService.checkout(tUsedByPart) : workable;
+								targetPartUsagelink = CumminsCopyBOM.linkTargetParts(workable, tUsesPart,
+										sourceBeanObj.getUsageLink());
+							}
+						} else {
+							if (tUsesPart != null) {
+								workable = workable == null ? GenericObjectService.checkout(tUsedByPart) : workable;
+								targetPartUsagelink = GenericObjectService.getPartUsageLink((WTPart) workable,
+										tUsesPart.getMaster());
+							}
+						}
+						/* Defect 208592 -Missing substitute part */
+						if (sourceBeanObj.getUsesSubstitutePart() != null
+								&& sourceBeanObj.getUsesSubstitutePart().size() > 0) {
+							workable = updateWTPartSubstituteLink(sourceBeanObj.getUsageLink(), targetPartUsagelink,
+									sUsesPart.getViewName(), sUsedByPart, tUsedByPart, tUsesPart, workable);
+						}
+	
+						if (targetPartUsagelink != null) {
+							// Update Usage link attribute
+							String org = sourceBeanObj.getUsesPart().getOrganizationName()
+									.replace(CumminsPartConstantIF.SPACE, CumminsPartConstantIF.UNDERSCORE).toLowerCase();
+							Map<String, String> partBomMap = (Map<String, String>) CumminsCopyBOM
+									.getAttributeList(EBOMTOMBOM, org);
+							workable = workable == null ? GenericObjectService.checkout(tUsedByPart) : workable;
+							ArrayList<String> loadStr = new ArrayList<String>((partBomMap.keySet()));
+							PersistableAdapter obj = new PersistableAdapter((Persistable) targetPartUsagelink, null,
+									Locale.US, null);
+							obj.load(loadStr);
+							for (Entry<String, String> attributeInternalName : partBomMap.entrySet()) {
+								String attributebomName = attributeInternalName.getKey();
+								Object sourceObject = CumminsIBAHelper.getAttributeValue(sourceBeanObj.getUsageLink(),
+										attributebomName);
+	
+								if (sourceObject != null) {
+									if (attributebomName.equals(CumminsPartConstantIF.METHOD_OF_USE)) {
+										sourceObject = sourceObject instanceof Object[] ? ((Object[]) sourceObject)[0]
+												: sourceObject;
+									}
+									if (attributebomName.equals(CumminsPartConstantIF.QUANTITY)) {
+										Object previousQuantityObject = "";
+										WTPart previousRevisionParentPart = (WTPart) InterfaceExecutionHelper
+												.getPreviousReleasedOrLimitedRevisionObject(sUsedByPart);
+										if (previousRevisionParentPart != null) {
+											Map<String, List<WTObject>> allPreviousChildren = getAllChildList(
+													previousRevisionParentPart);
+											for (Map.Entry<String, List<WTObject>> entryObject : allPreviousChildren
+													.entrySet()) {
+												String partNumber = entryObject.getKey();
+												if (partNumber.equals(sUsesPart.getNumber())) {
+													List<WTObject> partAndPartUsageLink = entryObject.getValue();
+													WTObject partUsageLink = partAndPartUsageLink.get(1);
+	
+													previousQuantityObject = CumminsIBAHelper
+															.getAttributeValue(partUsageLink, attributebomName);
+	
+													if (!(previousQuantityObject.equals(sourceObject))) {
+														obj.set(attributebomName, sourceObject);
+													}
+												}
+											}
+										} else {
+											obj.set(attributebomName, sourceObject);
+										}
+									} else {
+										obj.set(attributebomName, sourceObject);
+									}
+								}
+							}
+							obj.apply();
+							PersistenceHelper.manager.modify(targetPartUsagelink);
+	
+						}
+					}
+			}else if(graphFound!=null && graphFound.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("No")) {
+				if (tUsesPart != null) {
+					workable = workable == null ? GenericObjectService.checkout(tUsedByPart) : workable;
+					targetPartUsagelink = GenericObjectService.getPartUsageLink((WTPart) workable,
+							tUsesPart.getMaster());
+					if(targetPartUsagelink!=null) {
+						PersistenceHelper.manager.delete(targetPartUsagelink);
+					}
+				} else {
+					workable = workable == null ? GenericObjectService.checkout(tUsedByPart) : workable;
+					targetPartUsagelink = GenericObjectService.getPartUsageLink((WTPart) workable,
+							sUsesPart.getMaster());
+					if(targetPartUsagelink!=null) {
+						PersistenceHelper.manager.delete(targetPartUsagelink);
+					}
+				}
+			}else if(graphFound!=null && "".equals(graphFound.getExtBOMIncludeInStructureUpdated()) && "".equals(graphFound.getIsSourceUpdated()) && graphNodeObj.getLatestMfgPart()==null) {
+				//Doing this only at first time extension
+				if(tUsesPart!=null) {
+				workable = workable == null ? GenericObjectService.checkout(tUsedByPart) : workable;
+				targetPartUsagelink = GenericObjectService.getPartUsageLink((WTPart) workable,
+						tUsesPart.getMaster());
+				}
+				if(targetPartUsagelink!=null) {
+					PersistenceHelper.manager.delete(targetPartUsagelink);
+				}
+			}			
+		}
+		List<GraphNode> removedChildsReaddition = graphChild.stream()
+			        .filter(node -> node.getTypeOfChange().equals("Removed"))
+			        .collect(Collectors.toList());
+			for(GraphNode removednodesAddition:removedChildsReaddition) {
+				workable = workable == null ? GenericObjectService.checkout(downStreamPart) : workable;
+				WTPart previousEnggPart=getCompareVersion(upStreamPart, downStreamPart.getViewName());
+				WTPart engViewPart=CumminsBOMUtility.findPart(removednodesAddition.usedPartNumber, "Engineering");
+				WTPartUsageLink enggUsageLink = GenericObjectService.getPartUsageLink(previousEnggPart, engViewPart.getMaster());
+				if(enggUsageLink!=null && removednodesAddition.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("Yes")) {
+					WTPart mfgViewPart=CumminsBOMUtility.findPart(removednodesAddition.usedPartNumber, downStreamPart.getViewName());
+					if(mfgViewPart!=null) {
+						WTPartUsageLink targetPartUsagelink = GenericObjectService.getPartUsageLink((WTPart) workable,
+								mfgViewPart.getMaster());
+						if(targetPartUsagelink!=null ) {
+							// Update Usage link attribute
+							String org = engViewPart.getOrganizationName()
+									.replace(CumminsPartConstantIF.SPACE, CumminsPartConstantIF.UNDERSCORE).toLowerCase();
+							Map<String, String> partBomMap = (Map<String, String>) CumminsCopyBOM
+									.getAttributeList(EBOMTOMBOM, org);
+							workable = workable == null ? GenericObjectService.checkout(downStreamPart) : workable;
+							ArrayList<String> loadStr = new ArrayList<String>((partBomMap.keySet()));
+							PersistableAdapter obj = new PersistableAdapter((Persistable) targetPartUsagelink, null,
+									Locale.US, null);
+							obj.load(loadStr);
+							for (Entry<String, String> attributeInternalName : partBomMap.entrySet()) {
+								String attributebomName = attributeInternalName.getKey();
+								Object sourceObject = CumminsIBAHelper.getAttributeValue(enggUsageLink,
+										attributebomName);
+
+								if (sourceObject != null) {
+									if (attributebomName.equals(CumminsPartConstantIF.METHOD_OF_USE)) {
+										sourceObject = sourceObject instanceof Object[] ? ((Object[]) sourceObject)[0]
+												: sourceObject;
+									}
+									if (attributebomName.equals(CumminsPartConstantIF.QUANTITY)) {
+										Object previousQuantityObject = "";
+										WTPart previousRevisionParentPart = (WTPart) InterfaceExecutionHelper
+												.getPreviousReleasedOrLimitedRevisionObject(engViewPart);
+										if (previousRevisionParentPart != null) {
+											Map<String, List<WTObject>> allPreviousChildren = getAllChildList(
+													previousRevisionParentPart);
+											for (Map.Entry<String, List<WTObject>> entryObject : allPreviousChildren
+													.entrySet()) {
+												String partNumber = entryObject.getKey();
+												if (partNumber.equals(engViewPart.getNumber())) {
+													List<WTObject> partAndPartUsageLink = entryObject.getValue();
+													WTObject partUsageLink = partAndPartUsageLink.get(1);
+
+													previousQuantityObject = CumminsIBAHelper
+															.getAttributeValue(partUsageLink, attributebomName);
+
+													if (!(previousQuantityObject.equals(sourceObject))) {
+														obj.set(attributebomName, sourceObject);
+													}
+												}
+											}
+										} else {
+											obj.set(attributebomName, sourceObject);
+										}
+									} else {
+										obj.set(attributebomName, sourceObject);
+									}
+								}
+							}
+							obj.apply();
+							PersistenceHelper.manager.modify(targetPartUsagelink);
+
+						
+						}else {
+							targetPartUsagelink = CumminsCopyBOM.linkTargetParts(workable, mfgViewPart,
+									enggUsageLink);
+						}
+						
+					}
+				}else if(removednodesAddition.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("No")) {
+					WTPart mfgViewPart=CumminsBOMUtility.findPart(removednodesAddition.usedPartNumber, downStreamPart.getViewName());
+					if(mfgViewPart!=null) {
+						WTPartUsageLink targetPartUsagelink = GenericObjectService.getPartUsageLink((WTPart) workable,
+								mfgViewPart.getMaster());
+						if(targetPartUsagelink!=null ) {
+							PersistenceHelper.manager.delete(targetPartUsagelink);
+						}
+					} else {						
+						WTPartUsageLink targetPartUsagelink = GenericObjectService.getPartUsageLink((WTPart) workable,
+								(removednodesAddition.getGraphPart()).getMaster());
+						if(targetPartUsagelink!=null) {
+							PersistenceHelper.manager.delete(targetPartUsagelink);
+							}
+					}
+				}
+			}
+			for(CumminsMBOMItemListBean listBean:targetMBOMBeanList) {
+				if(listBean.getUsesPart().getViewName().equals(CumminsPartConstantIF.ENGINEERING)) {
+					if(CumminsBOMUtility.findPart(listBean.getUsesPart().getNumber(),strTargetView)==null){
+						downStreamPart  = (WTPart) VersionControlHelper.service.getLatestIteration(downStreamPart, false);
+						workable = workable == null ? GenericObjectService.checkout(downStreamPart) : workable;
+						WTPartUsageLink targetPartUsagelink = GenericObjectService.getPartUsageLink((WTPart) workable,listBean.getUsesPart().getMaster());
+						if(targetPartUsagelink!=null) {
+							PersistenceHelper.manager.delete(targetPartUsagelink);
+						}
+					}
+				}
+			}			
+			//Code to Handle Remove Addition Use Case
+			if (workable != null && WorkInProgressHelper.isWorkingCopy(workable)) {
+				try {
+					downStreamPart = (WTPart) WorkInProgressHelper.service.checkin(workable,
+							"Checkin Performed by System after updating part details");
+
+				} catch (Exception e) {
+					downStreamPart = (WTPart) WorkInProgressHelper.service.undoCheckout(workable);
+					LOGGER.error("Exception caught while doing Checkin" + e);
+				}
+			}
+		}catch (Exception e) {
+			LOGGER.error("Error in CumminsBeanHelper", e);
+			if (e.toString().contains("Item Relationship")) {
+				throw new WTException(e);
+			}
+		}
+		}
+		return downStreamPart;
+	
+}
+	
+	
+	
+	
+	
+	
+	
+	public static WTPart restructureBOMRILParts(WTPart upStreamPart, WTPart downStreamPart,GraphNode graphNodeObj)
+			throws WTPropertyVetoException, WTException {
+		if(downStreamPart!=null) {
+		String strTargetView = downStreamPart.getViewName();
+		List<CumminsMBOMItemListBean> targetMBOMBeanList = new ArrayList<CumminsMBOMItemListBean>();
+		List<String> manfPartChildsList = new ArrayList<String>();
+		ArrayList<String> sPartNumList = new ArrayList<String>();
+		List<CumminsBOMItemListBean> bomBeanList = CumminsBOMUtility.getFirstLevelBOMStructure(upStreamPart,
+				upStreamPart.getViewName());		
+		List<GraphNode> graphChild=graphNodeObj.getChildren();
+		boolean isParentConfigurableProduct =CumminsPartHelper.isConfigurableProduct(graphNodeObj.getGraphPart());
+
+		for (CumminsBOMItemListBean bomBean : bomBeanList) {
+			WTPart sourcePart = bomBean.getUsesPart();
+			sPartNumList.add(sourcePart.getNumber());
+		}
+		try {
+			targetMBOMBeanList = downStreamPart != null
+					? CumminsBOMUtility.getFirstLevelChildsMBOMStructure(downStreamPart, downStreamPart.getViewName())
+					: targetMBOMBeanList;
+			ArrayList<String> targetPartNumberList = removeLinkAndCollectPartNumber(targetMBOMBeanList, sPartNumList);
+			manfPartChildsList = downStreamPart != null
+					? getFirstLevelStructureWithOnlyManfPart(downStreamPart, downStreamPart.getViewName())
+					: manfPartChildsList;
+
+			if (bomBeanList == null || strTargetView == null ) {
+				return downStreamPart;
+			}
+			Workable workable = null;
+			
+			for (CumminsBOMItemListBean sourceBeanObj : bomBeanList) {
+				GraphNode graphFound = graphChild.stream()
+				        .filter(node -> node.usedPartNumber.equals(sourceBeanObj.getUsesPart().getNumber()))
+				        .findFirst()
+				        .orElse(null);
+				
+				WTPart sUsesPart = CumminsUtils.getLatestReleasedPart(sourceBeanObj.getUsesPart().getMaster(),
+						sourceBeanObj.getUsesPart().getView());
+				WTPart tUsesPart = CumminsBOMUtility.findPart(sUsesPart.getNumber(), strTargetView);
+				WTPart sUsedByPart = sourceBeanObj.getUsedByPart();
+				WTPart tUsedByPart = CumminsBOMUtility.findPart(sUsedByPart.getNumber(), strTargetView);
+				if(tUsedByPart!=null && downStreamPart!=null && tUsedByPart.getNumber().equalsIgnoreCase(downStreamPart.getNumber()))
+				{
+					tUsedByPart=downStreamPart;
+				}
+				WTPartUsageLink targetPartUsagelink = null;
+				boolean isUpdateNeeded=true;
+				if(isParentConfigurableProduct && graphFound!=null) {
+					boolean isOptionPart =CumminsPartHelper.isOptionPart(graphFound.getGraphPart());
+					if(isOptionPart) {
+						if(graphFound.getExtBOMIncludeInStructureUpdated().equalsIgnoreCase("No")) {
+							isUpdateNeeded=false;
+						}
+					}
+				}
+				if(graphFound!=null && (graphFound.getIsRILPart().equalsIgnoreCase("Yes")||graphFound.getRilAssemblyYes().equalsIgnoreCase("Yes")) && isUpdateNeeded) {
+					if (manfPartChildsList.contains(sUsesPart.getNumber())
+							&& !targetPartNumberList.contains(sUsesPart.getNumber())) {
+						// nothing to do as the part was present only inside Phantom/Manufacturing part
+						} 
+					else {
+						if (!targetPartNumberList.contains(sUsesPart.getNumber())) {
+							if (tUsesPart != null) {
+								workable = workable == null ? GenericObjectService.checkout(tUsedByPart) : workable;
+								targetPartUsagelink = CumminsCopyBOM.linkTargetParts(workable, tUsesPart,
+										sourceBeanObj.getUsageLink());
+							}
+						} else {
+							if (tUsesPart != null) {
+								workable = workable == null ? GenericObjectService.checkout(tUsedByPart) : workable;
+								targetPartUsagelink = GenericObjectService.getPartUsageLink((WTPart) workable,
+										tUsesPart.getMaster());
+							}
+						}
+						/* Defect 208592 -Missing substitute part */
+						if (sourceBeanObj.getUsesSubstitutePart() != null
+								&& sourceBeanObj.getUsesSubstitutePart().size() > 0) {
+							workable = updateWTPartSubstituteLink(sourceBeanObj.getUsageLink(), targetPartUsagelink,
+									sUsesPart.getViewName(), sUsedByPart, tUsedByPart, tUsesPart, workable);
+						}
+	
+						if (targetPartUsagelink != null) {
+							// Update Usage link attribute
+							String org = sourceBeanObj.getUsesPart().getOrganizationName()
+									.replace(CumminsPartConstantIF.SPACE, CumminsPartConstantIF.UNDERSCORE).toLowerCase();
+							Map<String, String> partBomMap = (Map<String, String>) CumminsCopyBOM
+									.getAttributeList(EBOMTOMBOM, org);
+							workable = workable == null ? GenericObjectService.checkout(tUsedByPart) : workable;
+							ArrayList<String> loadStr = new ArrayList<String>((partBomMap.keySet()));
+							PersistableAdapter obj = new PersistableAdapter((Persistable) targetPartUsagelink, null,
+									Locale.US, null);
+							obj.load(loadStr);
+							for (Entry<String, String> attributeInternalName : partBomMap.entrySet()) {
+								String attributebomName = attributeInternalName.getKey();
+								Object sourceObject = CumminsIBAHelper.getAttributeValue(sourceBeanObj.getUsageLink(),
+										attributebomName);
+	
+								if (sourceObject != null) {
+									if (attributebomName.equals(CumminsPartConstantIF.METHOD_OF_USE)) {
+										sourceObject = sourceObject instanceof Object[] ? ((Object[]) sourceObject)[0]
+												: sourceObject;
+									}
+									if (attributebomName.equals(CumminsPartConstantIF.QUANTITY)) {
+										Object previousQuantityObject = "";
+										WTPart previousRevisionParentPart = (WTPart) InterfaceExecutionHelper
+												.getPreviousReleasedOrLimitedRevisionObject(sUsedByPart);
+										if (previousRevisionParentPart != null) {
+											Map<String, List<WTObject>> allPreviousChildren = getAllChildList(
+													previousRevisionParentPart);
+											for (Map.Entry<String, List<WTObject>> entryObject : allPreviousChildren
+													.entrySet()) {
+												String partNumber = entryObject.getKey();
+												if (partNumber.equals(sUsesPart.getNumber())) {
+													List<WTObject> partAndPartUsageLink = entryObject.getValue();
+													WTObject partUsageLink = partAndPartUsageLink.get(1);
+	
+													previousQuantityObject = CumminsIBAHelper
+															.getAttributeValue(partUsageLink, attributebomName);
+	
+													if (!(previousQuantityObject.equals(sourceObject))) {
+														obj.set(attributebomName, sourceObject);
+													}
+												}
+											}
+										} else {
+											obj.set(attributebomName, sourceObject);
+										}
+									} else {
+										obj.set(attributebomName, sourceObject);
+									}
+								}
+							}
+							obj.apply();
+							PersistenceHelper.manager.modify(targetPartUsagelink);
+	
+						}
+					}
+			}			
+		}
+			for(CumminsMBOMItemListBean listBean:targetMBOMBeanList) {
+				if(listBean.getUsesPart().getViewName().equals(CumminsPartConstantIF.ENGINEERING)) {
+					if(CumminsBOMUtility.findPart(listBean.getUsesPart().getNumber(),strTargetView)==null){
+						downStreamPart  = (WTPart) VersionControlHelper.service.getLatestIteration(downStreamPart, false);
+						workable = workable == null ? GenericObjectService.checkout(downStreamPart) : workable;
+						WTPartUsageLink targetPartUsagelink = GenericObjectService.getPartUsageLink((WTPart) workable,listBean.getUsesPart().getMaster());
+						if(targetPartUsagelink!=null) {
+							PersistenceHelper.manager.delete(targetPartUsagelink);
+						}
+					}
+				}
+			}			
+			//Code to Handle Remove Addition Use Case
+			if (workable != null && WorkInProgressHelper.isWorkingCopy(workable)) {
+				try {
+					downStreamPart = (WTPart) WorkInProgressHelper.service.checkin(workable,
+							"Checkin Performed by System after updating RIL part details");
+
+				} catch (Exception e) {
+					downStreamPart = (WTPart) WorkInProgressHelper.service.undoCheckout(workable);
+					LOGGER.error("Exception caught while doing Checkin" + e);
+				}
+			}
+		}catch (Exception e) {
+			LOGGER.error("Error in CumminsBeanHelper", e);
+			if (e.toString().contains("Item Relationship")) {
+				throw new WTException(e);
+			}
+		}
+		}
+		return downStreamPart;
+	
+}
+
+	public static WTPart restructureBOMForBuy(WTPart mfgPart, GraphNode root) throws Exception {
+		try {
+			// FIX ME check out Part and once Usage Link is deleted check in again and also
+			// return checked in Part
+			if(!mfgPart.getViewName().equals("Enginnering"))
+			{
+				Workable workable = null;
+				boolean isCheckinRequired = false;
+				mfgPart  = (WTPart) VersionControlHelper.service.getLatestIteration(mfgPart, false);
+				List<CumminsBOMItemListBean> bomBeanList = CumminsBOMUtility.getFirstLevelBOMStructure(mfgPart,
+						mfgPart.getViewName());
+				List<GraphNode> graphChild=root.getChildren();
+				if(!bomBeanList.isEmpty()){
+					workable = workable == null ? GenericObjectService.checkout(mfgPart) : workable;				
+					QueryResult queryresult = PersistenceHelper.manager.navigate(workable, WTPartUsageLink.USES_ROLE,
+						WTPartUsageLink.class, false);
+					while (queryresult.hasMoreElements()) {
+						WTPartUsageLink wtpartusagelink = (WTPartUsageLink) queryresult.nextElement();
+						//get the part form wtpartusagelink
+						//check if that part is engg. then only delete
+						String partNumber = wtpartusagelink.getUses().getNumber();
+						WTPart engPart = CumminsBOMUtility.findPart(partNumber, "Engineering");
+						GraphNode graphFound = graphChild.stream()
+						        .filter(node -> node.usedPartNumber.equals(partNumber))
+						        .findFirst()
+						        .orElse(null);
+						boolean isRILAssembly=false;
+						
+						if(graphFound == null) {
+							if(("Yes").equals(CumminsUtils.getAttributeValue(wtpartusagelink.getUses(),InterfaceConstant.IBA_RIL_INDICATOR))||("Yes").equals(CumminsUtils.getAttributeValue(wtpartusagelink.getUses(),InterfaceConstant.IBA_RIL_ASSEMBLY))) {
+								isRILAssembly=true;	
+							}
+						}else {
+							if(graphFound.getTypeOfChange().equalsIgnoreCase("Removed")) {
+								if(("Yes").equals(CumminsUtils.getAttributeValue(wtpartusagelink.getUses(),InterfaceConstant.IBA_RIL_INDICATOR))||("Yes").equals(CumminsUtils.getAttributeValue(wtpartusagelink.getUses(),InterfaceConstant.IBA_RIL_ASSEMBLY))) {
+									isRILAssembly=false;	
+								}
+							}
+						}
+						if(isRILAssembly) {
+							//do nothing as IT is RIL Part or Assembly
+						}
+						else if (engPart != null) {							 
+							PersistenceHelper.manager.delete(wtpartusagelink);							
+						}
+					}
+					mfgPart = (WTPart) WorkInProgressHelper.service.checkin(workable,
+							"Checkin Performed by System after updating part details");
+					return mfgPart;
+				}
+			}
+		} catch (Exception ee) {
+			LOGGER.debug("Exception CumminsBeanHelper - restructureBOMForBuy() :" + ee);
+			throw new Exception(
+					"Exception captured while Restructuring of BOM For Buy" + ee.getStackTrace()[0].getLineNumber(),
+					ee);
+		}
+		return mfgPart;
+	}
+
+	
+	public static Workable updateWTPartSubstituteLink(WTPartUsageLink sourcePartUsageLink,
+			WTPartUsageLink targetPartUsagelink, String sourceViewName, WTPart sUsedByPart, WTPart tUsedByPart,
+			WTPart tUsesPart, Workable workable) {
+
+		try {
+			QueryResult targetPartSubstituteQR = WTPartHelper.service.getSubstitutesWTPartMasters(targetPartUsagelink);
+			ArrayList<WTPartMaster> targetPartSubstituteLinkList = CumminsCopyBOM
+					.getPartSubstituteLinkList(targetPartSubstituteQR);
+
+			QueryResult sourcePartSubstituteQR = WTPartHelper.service.getSubstitutesWTPartMasters(sourcePartUsageLink);
+			ArrayList<WTPartMaster> sourcePartSubstituteLinkList = CumminsCopyBOM
+					.getPartSubstituteLinkList(sourcePartSubstituteQR);
+
+			for (WTPartMaster targetPartMaster : targetPartSubstituteLinkList) {
+				if (!sourcePartSubstituteLinkList.contains(targetPartMaster)) {
+					workable = workable == null ? GenericObjectService.checkout(tUsedByPart) : workable;
+					QueryResult queryresult = PersistenceHelper.manager.find(WTPartSubstituteLink.class,
+							targetPartUsagelink, WTPartSubstituteLink.SUBSTITUTE_FOR_ROLE, targetPartMaster);
+					while (queryresult.hasMoreElements()) {
+						WTPartSubstituteLink subLink = (WTPartSubstituteLink) queryresult.nextElement();
+						if (subLink != null && PersistenceHelper.isPersistent(subLink)) {
+							PersistenceHelper.manager.delete(subLink);
+						}
+
+					}
+				}
+			}
+
+			for (WTPartMaster sourcePartMaster : sourcePartSubstituteLinkList) {
+				if (!targetPartSubstituteLinkList.contains(sourcePartMaster)) {
+					WTPartSubstituteLink subLink = (WTPartSubstituteLink) PersistenceHelper.manager
+							.save(WTPartSubstituteLink.newWTPartSubstituteLink(targetPartUsagelink, sourcePartMaster));
+					CumminsIBAHelper.setOrUpdateAttributeValuewithoutCheckOut(subLink, "replacementType", "s");
+				}
+			}
+		} catch (Exception e) {
+			LOGGER.debug("Exception in CumminsBeanHelper - getPartSubstituteLinkList() " + e);
+
+		}
+		return workable;
+	}
+
+	public static Map<String, List<WTObject>> getAllChildList(WTPart targetPart) throws WTException {
+		Map<String, List<WTObject>> previousChildList = new HashMap<String, List<WTObject>>();
+		if (targetPart != null) {
+			previousChildList = InterfaceExecutionHelper.getAllChilds(targetPart);
+		}
+		return previousChildList;
+	}
+
+	public static List<String> getFirstLevelStructureWithOnlyManfPart(WTPart parentPart, String strTargetView)
+			throws WTException, WTPropertyVetoException {
+		LOGGER.debug("In CumminsBeanHelper - getFirstLevelStructureWithManfPart()");
+		List<CumminsMBOMItemListBean> mbomList = new ArrayList<CumminsMBOMItemListBean>();
+		ArrayList<String> tPartNumList = new ArrayList<String>();
+		String type = null;
+		try {
+
+			View targetView = ViewHelper.service.getView(strTargetView);
+			WTPartStandardConfigSpec wtPartStandardConfigSpec = WTPartStandardConfigSpec.newWTPartStandardConfigSpec();
+			wtPartStandardConfigSpec.setView(targetView);
+			// Query firstlevel child parts
+			QueryResult queryresult = StructHelper.service.navigateUsesToIteration(parentPart, WTPartUsageLink.class,
+					false, wtPartStandardConfigSpec);
+			while (queryresult.hasMoreElements()) {
+
+				Persistable[] queryObject = (Persistable[]) queryresult.nextElement();
+
+				if (queryObject[1] instanceof WTPart) {
+					// Child part
+					WTPart toNode = (WTPart) queryObject[1];
+					// get type of child part
+					WTPart correspondingEnggPart=CumminsBOMUtility.findPart(toNode.getNumber(), "Engineering");
+					if (correspondingEnggPart==null) {
+						mbomList.addAll(CumminsCopyBOM.getFirstLevelStructureWithManfPart(toNode, strTargetView));
+					}
+				}
+			}
+			for (CumminsMBOMItemListBean mbomBean : mbomList) {
+				tPartNumList.add(mbomBean.getUsesPartNumber());
+			}
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			LOGGER.debug(parentPart.getNumber()
+					+ "-Exception in CumminsBeanHelper - getFirstLevelStructureWithManfPart()--" + e);
+		}
+		return tPartNumList;
+	}
+
+	public static ArrayList<String> removeLinkAndCollectPartNumber(List<CumminsMBOMItemListBean> targetMBOMBeanList,
+			ArrayList<String> sPartNumList) throws Exception {
+		ArrayList<String> tPartNumList = new ArrayList<String>();
+		Workable workable = null;
+		try {
+			for (CumminsMBOMItemListBean mbomBean : targetMBOMBeanList) {
+				WTPart tUsesPart = mbomBean.getUsesPart();
+				WTPart tUsedByPart = mbomBean.getUsedByPart();
+				tPartNumList.add(mbomBean.getUsesPartNumber());
+				WTPart correspondingEnggPart=CumminsBOMUtility.findPart(tUsesPart.getNumber(), "Engineering");
+				// 208964- Added condition for not to be Manufacturing option part
+				if (!sPartNumList.contains(tUsesPart.getNumber()) && correspondingEnggPart==null) {
+					// Do Nothing
+					
+					/*workable = GenericObjectService.checkout(tUsedByPart);
+
+					WTPartUsageLink wtPartusagelink = GenericObjectService.getPartUsageLink((WTPart) workable,
+							tUsesPart.getMaster());
+					if (wtPartusagelink != null && PersistenceHelper.isPersistent(wtPartusagelink)) {
+						PersistenceHelper.manager.delete(wtPartusagelink);
+					}*/
+					
+				} else if(!(tUsesPart.getViewName().equalsIgnoreCase("Engineering"))){
+					List<CumminsMBOMItemListBean> manfMBOBBeanList = new ArrayList<CumminsMBOMItemListBean>();
+					manfMBOBBeanList = tUsesPart != null
+							? CumminsBOMUtility.getFirstLevelChildsMBOMStructure(tUsesPart, tUsesPart.getViewName())
+							: manfMBOBBeanList;
+					removeLinkAndCollectPartNumber(manfMBOBBeanList, sPartNumList);
+					if(GenericObjectService.isPartCheckedOut(workable)) {
+					workable = GenericObjectService.checkout(tUsesPart);
+					if (WorkInProgressHelper.isWorkingCopy(workable)) {
+						try {
+							workable = WorkInProgressHelper.service.checkin(workable, "Checkin Performed by System after Sync with Engineering");
+						} catch (Exception e) {
+							WorkInProgressHelper.service.undoCheckout(workable);
+							LOGGER.error("Exception caught while doing Checkin" + e);
+						}
+					}
+				}
+				}
+			}
+		} catch (Exception e) {
+			LOGGER.error("Exception in CumminsBeanHelper - removeLinkAndCollectPartNumber()" + e);
+			if (e.toString().contains("Item Relationship")) {
+				throw new WTException(e);
+			}
+		}
+		return tPartNumList;
+	}
+	
+	public static String getRevision(String version) {
+		
+		String revision = "";
+		try {
+			if(version!="") {
+				revision = (version.split("\\."))[0];	
+			}
+		}catch (Exception e) {
+			LOGGER.error("Exception in CumminsBeanHelper - getRevision()" + e);			
+		}
+		return revision;
+	}
+	
+	public static String getIteration(String version) {
+		
+		String iteration = "";
+		try {
+			if(version!="") {
+				iteration = (version.split("\\("))[0];	
+				iteration = (iteration.split("\\."))[1];
+			}
+		}catch (Exception e) {
+			LOGGER.error("Exception in CumminsBeanHelper - getRevision()" + e);			
+		}
+		return iteration;
+	}
+
+	public static void updateRejectPlantMarking(GraphNode root) {
+		try {
+			WTPart enggPart = root.getGraphPart();
+			String srcval = root.getSourceattr();
+			MPMPlant plantName = root.getPlant();
+			if (enggPart != null) {
+				//MPMPlant plant = CumminsPlantHelper.getPlantbyName(viewName);
+				MPMPartToPlantAssignmentLink mpmLink = CumminsPlantHelper
+						.getActivePlantLinkbetweenPartandPlant(enggPart, plantName);
+				WTPart mpart = CumminsBOMUtility.findPart(((WTPart) enggPart).getNumber(), plantName.getName());
+				String rejectVal = (String) CumminsIBAHelper.getAttributeValue(mpmLink,
+						CumminsPlantConstantIF.REJECT_PLANT_MARKING_IBA);
+				if (mpmLink != null && mpart == null && srcval.equalsIgnoreCase("None")) {
+					CumminsPlantHelper.setUpdateIBAValue(mpmLink, CumminsPlantConstantIF.REJECT_PLANT_MARKING_IBA,
+							CumminsPlantConstantIF.RPM_PENDING_REJECTED);
+					LOGGER.debug("Reject plant Marking   after updating in database = " + rejectVal);
+				} 
+				else {
+					if(rejectVal!=null && !rejectVal.isEmpty()) {
+						CumminsPlantHelper.setUpdateIBAValue(mpmLink,CumminsPlantConstantIF.REJECT_PLANT_MARKING_IBA, "");
+						System.out.println("Value when  it is not none-");
+					}
+						
+				}
+			}
+
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	/**
+	 * new iteration will be generated when any attribute change happens
+	 *
+	 * @param WTPart
+	 *            
+	 * returns WTPart
+	 *      
+	 */
+	public static WTPart createNewIterationWithChange(WTPart mfgPart,boolean isSourceUpdated) {
+		try {
+			Workable workable = null;	
+			if(isSourceUpdated) {
+				if(!WorkInProgressHelper.isCheckedOut(mfgPart)) {			
+					workable = workable == null ? GenericObjectService.checkout(mfgPart) : workable;
+				}
+				mfgPart = (WTPart) WorkInProgressHelper.service.checkin(workable,
+						"Checkin Performed by System after updating part details");
+			}
+		}catch (Exception e) {
+			 LOGGER.debug("Error in CumminsBeanHelper:getWhereUsedObjs() " + e);
+			e.printStackTrace();
+		}
+		return mfgPart;
+	}
+	
+	
+	/**
+	 * Create a equivalence Link
+	 * 
+	 * @param targetPart
+	 *            : WTPart
+	 * @return WTPart
+	 * @throws WTException
+	 *             the WT exception
+	 */
+
+	public static boolean createEquivalenceLink(WTPart upStreamPart,
+			WTPart targetPart) throws WTException, Exception {
+		WTPrincipal currentuser=SessionHelper.manager.getPrincipal();
+
+		try {
+			LOGGER.debug("In CumminsCopyBOM - createEquivalenceLink()");
+			SessionHelper.manager.setAdministrator();
+			if (upStreamPart == null || targetPart == null) {
+				return false;
+			}
+			boolean linkAlreadyExists = CumminsBOMUtility
+					.checkEquivalenceLinkExists(upStreamPart, targetPart);			
+			if (!linkAlreadyExists) {
+				// create equivelencelink between the source part and target
+				// part
+				EquivalenceLink eqLink = EquivalenceLink.newEquivalenceLink(
+						upStreamPart, targetPart);
+				eqLink.setIsConsumable(true);
+				eqLink.setUpstreamContextRef(upStreamPart.getView());
+				eqLink.setDownstreamContextRef(targetPart.getView());
+				eqLink = (EquivalenceLink) PersistenceHelper.manager
+						.save(eqLink);
+			}
+			return true;
+		} catch (Exception ee) {
+		
+			LOGGER.info("Exception createEquivalenceLink():"
+					+ ee);
+			throw new Exception("Exception in EquivalenceLink Creation for "+upStreamPart.getNumber()+" Kindly delete " +targetPart.getIdentity()+"and Check reason for Error and Resubmit task",ee);
+		}finally {
+			 if(currentuser!=null){
+			 SessionHelper.manager.setAuthenticatedPrincipal(currentuser.getName());
+			 }
+			}
+	}
+	
+}//End of Class
