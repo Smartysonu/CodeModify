@@ -1,101 +1,63 @@
-package ext.cummins.part.dataUtilities;
+import { UiService } from './ui.service';
 
-import com.ptc.core.components.descriptor.ModelContext;
-import com.ptc.core.components.factory.dataUtilities.DefaultDataUtility;
-import com.ptc.core.components.rendering.guicomponents.TextDisplayComponent;
-import com.ptc.core.components.rendering.guicomponents.UrlDisplayComponent;
+describe('UiService', () => {
+  let service: UiService;
 
-import wt.fc.ObjectReference;
-import wt.fc.ReferenceFactory;
-import wt.httpgw.GatewayServletHelper;
-import wt.httpgw.URLFactory;
-import wt.part.WTPart;
-import wt.util.WTException;
-import wt.workflow.forum.DiscussionForum;
-import wt.workflow.forum.DiscussionPosting;
-import wt.workflow.forum.DiscussionTopic;
-import wt.workflow.forum.ForumHelper;
+  beforeEach(() => {
+    service = new UiService();
+  });
 
-import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.List;
+  it('should set scrollLeft when slider and current exist', () => {
+    const mockCurrent = { offsetLeft: 200 };
+    const mockSlider = {
+      querySelector: jasmine.createSpy().and.returnValue(mockCurrent),
+      scrollLeft: 0
+    };
 
-public class CumminsGetDiscussionDataUtility extends DefaultDataUtility {
+    spyOn(document, 'querySelector').and.callFake((selector: string) => {
+      if (selector === '.rs-metroline-mobile ul') return mockSlider as any;
+      return null;
+    });
 
-    @Override
-    public Object getDataValue(String columnName, Object object, ModelContext modelContext) throws WTException {
-   System.out.println("columnName:" + columnName);
-        List<Object> components = new ArrayList<>();
+    // Simulate global _get function
+    (window as any)._get = (obj: any, prop: string) => obj[prop];
 
-        if (object instanceof WTPart) {
-            WTPart part = (WTPart) object;
-            Enumeration<?> forums = ForumHelper.service.getForums(part);
+    service.handleMetrolineCounterMobile();
 
-            if (forums.hasMoreElements()) {
-                DiscussionForum forum = (DiscussionForum) forums.nextElement();
-                Enumeration<?> topics = forum.getTopics();
+    expect(mockSlider.scrollLeft).toBe(200 - window.innerWidth / 2 + 5);
+  });
 
-                while (topics.hasMoreElements()) {
-                    DiscussionTopic topic = (DiscussionTopic) topics.nextElement();
-                    Enumeration<?> postings = topic.getPostings();
+  it('should not scroll if slider is null', () => {
+    spyOn(document, 'querySelector').and.returnValue(null);
+    service.handleMetrolineCounterMobile();
+    // nothing to expect – just ensuring no error is thrown
+  });
 
-                    while (postings.hasMoreElements()) {
-                        DiscussionPosting posting = (DiscussionPosting) postings.nextElement();
+  it('should not scroll if current is null', () => {
+    const mockSlider = {
+      querySelector: jasmine.createSpy().and.returnValue(null),
+      scrollLeft: 0
+    };
+    spyOn(document, 'querySelector').and.returnValue(mockSlider as any);
+    service.handleMetrolineCounterMobile();
+    expect(mockSlider.scrollLeft).toBe(0); // unchanged
+  });
 
-                        String subject = topic.getName() != null ? topic.getName() : "";
-                        String message = posting.getMessage() != null ? posting.getMessage() : "";
-                        Timestamp created = posting.getCreateTimestamp();
-                        Timestamp modified = posting.getModifyTimestamp();
+  it('should use fallback if offsetLeft is undefined', () => {
+    const mockCurrent = {}; // no offsetLeft
+    const mockSlider = {
+      querySelector: jasmine.createSpy().and.returnValue(mockCurrent),
+      scrollLeft: 0
+    };
 
-                        switch (columnName) {
-                            case "subject":
-                                components.add(new TextDisplayComponent("subject", subject));
-                                break;
-                            case "message":
-                                components.add(new TextDisplayComponent("message", message));
-                                break;
-                            case "createdDate":
-                                components.add(new TextDisplayComponent("createdDate", created != null ? created.toString() : ""));
-                                break;
-                            case "modificationDate":
-                                components.add(new TextDisplayComponent("modificationDate", modified != null ? modified.toString() : ""));
-                                break;
-                           case "url":
-			    UrlDisplayComponent urlDisplay = new UrlDisplayComponent(columnName, null, null, null);
-			     // Create link to topic
-                    HashMap<String, String> hashmap = new HashMap<>();
-                    hashmap.put("action", "ObjProps");
-                    ObjectReference objectreference = ObjectReference.newObjectReference(topic);
-                    ReferenceFactory referencefactory = new ReferenceFactory();
-                    hashmap.put("oid", referencefactory.getReferenceString(objectreference));
-                    URLFactory urlfactory = new URLFactory();
-                    String url = GatewayServletHelper.buildAuthenticatedHREF(
-                            urlfactory,
-                            "wt.enterprise.URLProcessor",
-                            "URLTemplateAction",
-                            null,
-                            hashmap
-                    );
+    spyOn(document, 'querySelector').and.callFake((selector: string) => {
+      if (selector === '.rs-metroline-mobile ul') return mockSlider as any;
+      return null;
+    });
 
-			    //String topicName = topic.getName() != null ? topic.getName() : "Untitled Topic";
-			    urlDisplay.setLink(url);
-		            urlDisplay.setLabel(topic.getName());
-		            urlDisplay.setName(topic.getName());
-		            urlDisplay.setTarget("_blank");
+    (window as any)._get = () => null; // simulate _get returning falsy
 
-                            components.add(urlDisplay);
-			  
-                            System.out.println("Generated URL for topic: " + topic.getName() + " -> " + url);
-			    break;              
-                         }
-                    }
-                }
-            }
-        }
-
-    
-        return components;
-    }
-}
+    service.handleMetrolineCounterMobile();
+    expect(mockSlider.scrollLeft).toBe(0 - window.innerWidth / 2 + 5);
+  });
+});
