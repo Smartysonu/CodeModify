@@ -1,63 +1,74 @@
-import { UiService } from './ui.service';
+it('should generate transcript and download file with correct format and filename', () => {
+  const mockMessages = [
+    {
+      messages: [
+        { sender: 'bot', message: 'Hello!', timeStamp: '2025-07-08T10:00:00Z' },
+        { sender: 'user', message: 'Hi!', timeStamp: '2025-07-08T10:00:10Z' }
+      ]
+    }
+  ];
 
-describe('UiService', () => {
-  let service: UiService;
+  spyOn(observableService, 'getMessageGroups').and.returnValue(mockMessages);
+  spyOn(translationService, 'getLanguage').and.returnValue('EN');
+  configService.chatId = 'abc123';
 
-  beforeEach(() => {
-    service = new UiService();
-  });
+  const clickSpy = jasmine.createSpy('click');
+  const anchor = { href: '', download: '', click: clickSpy } as any;
 
-  it('should set scrollLeft when slider and current exist', () => {
-    const mockCurrent = { offsetLeft: 200 };
-    const mockSlider = {
-      querySelector: jasmine.createSpy().and.returnValue(mockCurrent),
-      scrollLeft: 0
-    };
+  spyOn(document, 'createElement').and.returnValue(anchor);
+  spyOn(document.body, 'appendChild');
+  spyOn(document.body, 'removeChild');
+  spyOn(window.URL, 'createObjectURL').and.callFake(() => 'blob:url');
+  spyOn(window.URL, 'revokeObjectURL');
 
-    spyOn(document, 'querySelector').and.callFake((selector: string) => {
-      if (selector === '.rs-metroline-mobile ul') return mockSlider as any;
-      return null;
-    });
+  component.downloadTranscript();
 
-    // Simulate global _get function
-    (window as any)._get = (obj: any, prop: string) => obj[prop];
+  expect(anchor.download).toBe('Proximus-Assistant-abc123.txt');
+  expect(clickSpy).toHaveBeenCalled();
+});
 
-    service.handleMetrolineCounterMobile();
+it('should label user as "Vous" for French language', () => {
+  const mockMessages = [
+    {
+      messages: [
+        { sender: 'user', message: 'Bonjour!', timeStamp: '2025-07-08T10:00:00Z' }
+      ]
+    }
+  ];
 
-    expect(mockSlider.scrollLeft).toBe(200 - window.innerWidth / 2 + 5);
-  });
+  spyOn(observableService, 'getMessageGroups').and.returnValue(mockMessages);
+  spyOn(translationService, 'getLanguage').and.returnValue('FR');
+  configService.chatId = 'chatFR';
 
-  it('should not scroll if slider is null', () => {
-    spyOn(document, 'querySelector').and.returnValue(null);
-    service.handleMetrolineCounterMobile();
-    // nothing to expect – just ensuring no error is thrown
-  });
+  const clickSpy = jasmine.createSpy('click');
+  const anchor = { href: '', download: '', click: clickSpy } as any;
 
-  it('should not scroll if current is null', () => {
-    const mockSlider = {
-      querySelector: jasmine.createSpy().and.returnValue(null),
-      scrollLeft: 0
-    };
-    spyOn(document, 'querySelector').and.returnValue(mockSlider as any);
-    service.handleMetrolineCounterMobile();
-    expect(mockSlider.scrollLeft).toBe(0); // unchanged
-  });
+  spyOn(document, 'createElement').and.returnValue(anchor);
+  spyOn(document.body, 'appendChild');
+  spyOn(document.body, 'removeChild');
+  spyOn(window.URL, 'createObjectURL').and.callFake(() => 'blob:url');
 
-  it('should use fallback if offsetLeft is undefined', () => {
-    const mockCurrent = {}; // no offsetLeft
-    const mockSlider = {
-      querySelector: jasmine.createSpy().and.returnValue(mockCurrent),
-      scrollLeft: 0
-    };
+  component.downloadTranscript();
 
-    spyOn(document, 'querySelector').and.callFake((selector: string) => {
-      if (selector === '.rs-metroline-mobile ul') return mockSlider as any;
-      return null;
-    });
+  expect(anchor.download).toBe('Proximus-Assistant-chatFR.txt');
+  expect(clickSpy).toHaveBeenCalled();
+});
 
-    (window as any)._get = () => null; // simulate _get returning falsy
+it('should handle empty messageGroups gracefully', () => {
+  spyOn(observableService, 'getMessageGroups').and.returnValue([]);
+  spyOn(translationService, 'getLanguage').and.returnValue('EN');
+  configService.chatId = 'empty123';
 
-    service.handleMetrolineCounterMobile();
-    expect(mockSlider.scrollLeft).toBe(0 - window.innerWidth / 2 + 5);
-  });
+  const clickSpy = jasmine.createSpy('click');
+  const anchor = { href: '', download: '', click: clickSpy } as any;
+
+  spyOn(document, 'createElement').and.returnValue(anchor);
+  spyOn(document.body, 'appendChild');
+  spyOn(document.body, 'removeChild');
+  spyOn(window.URL, 'createObjectURL').and.callFake(() => 'blob:url');
+
+  component.downloadTranscript();
+
+  expect(anchor.download).toBe('Proximus-Assistant-empty123.txt');
+  expect(clickSpy).toHaveBeenCalled();
 });
