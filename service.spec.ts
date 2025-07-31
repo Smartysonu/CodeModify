@@ -1,3 +1,20 @@
+<!-- HTML content -->
+<div class="messagebox">
+  <strong>Votre installation est en cours de préparation</strong>
+  Nous vous contacterons très bientôt avec plus d’informations ou pour vous demander des détails supplémentaires. Veuillez patienter.
+</div>
+
+<button class="accordion">Section 1</button>
+<div class="panel">
+  <p>Contenu de la section 1 affiché correctement.</p>
+</div>
+
+<button class="accordion">Section 2</button>
+<div class="panel">
+  <p>Contenu de la section 2 affiché correctement.</p>
+</div>
+
+<!-- CSS -->
 <style>
   .messagebox {
     border-left: 5px solid red;
@@ -42,21 +59,7 @@
   }
 </style>
 
-<div class="messagebox">
-  <strong>Votre installation est en cours de préparation</strong>
-  Nous vous contacterons très bientôt avec plus d’informations ou pour vous demander des détails supplémentaires. Veuillez patienter.
-</div>
-
-<button class="accordion">Section 1</button>
-<div class="panel">
-  <p>Contenu de la section 1 affiché correctement.</p>
-</div>
-
-<button class="accordion">Section 2</button>
-<div class="panel">
-  <p>Contenu de la section 2 affiché correctement.</p>
-</div>
-
+<!-- JavaScript -->
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const accordions = document.querySelectorAll(".accordion");
