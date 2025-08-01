@@ -1,79 +1,94 @@
-<!-- HTML content -->
-<div class="messagebox">
-  <strong>Votre installation est en cours de préparation</strong>
-  Nous vous contacterons très bientôt avec plus d’informations ou pour vous demander des détails supplémentaires. Veuillez patienter.
-</div>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Accordion Without Button Tag</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
 
-<button class="accordion">Section 1</button>
-<div class="panel">
-  <p>Contenu de la section 1 affiché correctement.</p>
-</div>
+    .messagebox {
+      border-left: 5px solid red;
+      background-color: #f5f5f5;
+      padding: 15px;
+      color: #000;
+      margin-bottom: 20px;
+    }
 
-<button class="accordion">Section 2</button>
-<div class="panel">
-  <p>Contenu de la section 2 affiché correctement.</p>
-</div>
+    .messagebox strong {
+      color: red;
+      display: block;
+      margin-bottom: 8px;
+    }
 
-<!-- CSS -->
-<style>
-  .messagebox {
-    border-left: 5px solid red;
-    background-color: #f5f5f5;
-    padding: 15px;
-    color: #000;
-    margin-bottom: 20px;
-  }
-  .messagebox strong {
-    color: red;
-    display: block;
-    margin-bottom: 8px;
-  }
-  .accordion {
-    background-color: #eee;
-    color: #444;
-    cursor: pointer;
-    padding: 10px;
-    width: 100%;
-    border: none;
-    text-align: left;
-    font-size: 16px;
-    transition: 0.3s;
-    margin-top: 10px;
-  }
-  .accordion.active,
-  .accordion:hover {
-    background-color: #ccc;
-  }
-  .panel {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease-out;
-    background-color: white;
-    padding: 0 15px;
-    border: 1px solid #ccc;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-  }
-  .panel.show {
-    padding: 15px;
-    max-height: 500px;
-  }
-</style>
+    .accordion-header {
+      background-color: #eee;
+      color: #444;
+      cursor: pointer;
+      padding: 10px;
+      width: 100%;
+      text-align: left;
+      font-size: 16px;
+      transition: background-color 0.3s;
+      margin-top: 10px;
+      border: 1px solid #ccc;
+    }
 
-<!-- JavaScript -->
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const accordions = document.querySelectorAll(".accordion");
+    .accordion-header:hover,
+    .accordion-header.active {
+      background-color: #ccc;
+    }
 
-    accordions.forEach(btn => {
-      btn.addEventListener("click", function () {
-        const panel = this.nextElementSibling;
+    .panel {
+      display: none;
+      padding: 15px;
+      background-color: white;
+      border: 1px solid #ccc;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
 
-        document.querySelectorAll(".panel").forEach(p => {
-          if (p !== panel) p.classList.remove("show");
+  <!-- Red Message Box -->
+  <div class="messagebox">
+    <strong>Votre installation est en cours de préparation</strong>
+    Nous vous contacterons très bientôt avec plus d’informations ou pour vous demander des détails supplémentaires. Veuillez patienter.
+  </div>
+
+  <!-- Accordion Sections -->
+  <div class="accordion-header">Section 1</div>
+  <div class="panel">
+    <p>Contenu de la section 1 affiché correctement.</p>
+  </div>
+
+  <div class="accordion-header">Section 2</div>
+  <div class="panel">
+    <p>Contenu de la section 2 affiché correctement.</p>
+  </div>
+
+  <!-- Script -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const headers = document.querySelectorAll(".accordion-header");
+
+      headers.forEach(header => {
+        header.addEventListener("click", function () {
+          // Close all other panels
+          document.querySelectorAll(".panel").forEach(p => {
+            if (p !== this.nextElementSibling) p.style.display = "none";
+          });
+
+          // Toggle this panel
+          const panel = this.nextElementSibling;
+          panel.style.display = (panel.style.display === "block") ? "none" : "block";
         });
-
-        panel.classList.toggle("show");
       });
     });
-  });
-</script>
+  </script>
+
+</body>
+</html>
