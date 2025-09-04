@@ -1,49 +1,56 @@
-import { Subject } from 'rxjs';
+describe('loadActionLib', () => {
+  // keep whatever your component reference is:
+  // let component: HeaderComponent;  // example
 
-it('should trigger session-ended event and call handleSessionHasEnded when data is non-empty', () => {
-  // 1) Use the DI instances the component actually uses
-  const obsSvc = TestBed.inject(ObservableService as any);      // <-- use your real type
-  const respSvc = TestBed.inject(ResponseService as any);       // <-- use your real type
+  let originalInception: any;
 
-  // 2) Spy on the real service method
-  const endSpy = spyOn(obsSvc, 'triggerSessionEndedEvent');
+  beforeEach(() => {
+    // snapshot any existing global so we can restore it safely
+    originalInception = (component as any).window?.inception;
+  });
 
-  // 3) Drive the observable the component subscribes to
-  const ended$ = new Subject<any>();
-  // If it's a public field, just overwrite it:
-  (obsSvc as any).triggerSessionHasEndedMessages$ = ended$;
+  afterEach(() => {
+    // restore / remove any test mutation
+    if ((component as any).window) {
+      if (originalInception === undefined) {
+        delete (component as any).window.inception;
+      } else {
+        (component as any).window.inception = originalInception;
+      }
+    }
+  });
 
-  // 4) Spy on the response handler
-  const handleSpy = spyOn(respSvc, 'handleSessionHasEnded');
+  it('should return early when window["inception"] is missing', () => {
+    // Arrange: make sure inception is NOT present
+    (component as any).window = (component as any).window || (window as any);
+    delete (component as any).window.inception;
 
-  // 5) Call the private method (bypass TS with "as any")
-  (component as any).getManuallyTriggeredSessionEndedEvent();
+    // (No spies at all — if the function returns early, nothing to assert gets called)
+    // Act
+    (component as any).loadActionLib();
 
-  // 6) Emit a NON-empty payload so lodash/isEmpty returns false
-  const payload = { reason: 'timeout' };
-  ended$.next(payload);
+    // Assert: nothing threw; optional: assert that property is still undefined
+    expect((component as any).window.inception).toBeUndefined();
+  });
 
-  // 7) Assert
-  expect(endSpy).toHaveBeenCalled();
-  expect(handleSpy).toHaveBeenCalledWith(payload);
-});
+  it('should call inception.webComponentLoad and inception.actionMenu with component when present', () => {
+    // Arrange
+    const wcSpy = jasmine.createSpy('webComponentLoad');
+    const amSpy = jasmine.createSpy('actionMenu');
 
-it('should trigger session-ended event but NOT call handleSessionHasEnded when data is empty', () => {
-  const obsSvc = TestBed.inject(ObservableService as any);
-  const respSvc = TestBed.inject(ResponseService as any);
+    (component as any).window = (component as any).window || (window as any);
+    (component as any).window.inception = {
+      webComponentLoad: wcSpy,
+      actionMenu: amSpy,
+    };
 
-  const endSpy = spyOn(obsSvc, 'triggerSessionEndedEvent');
+    // Act
+    (component as any).loadActionLib();
 
-  const ended$ = new Subject<any>();
-  (obsSvc as any).triggerSessionHasEndedMessages$ = ended$;
-
-  const handleSpy = spyOn(respSvc, 'handleSessionHasEnded');
-
-  (component as any).getManuallyTriggeredSessionEndedEvent();
-
-  // Emit an EMPTY object so isEmpty(...) is true → handler should NOT fire
-  ended$.next({});
-
-  expect(endSpy).toHaveBeenCalled();
-  expect(handleSpy).not.toHaveBeenCalled();
+    // Assert
+    expect(wcSpy).toHaveBeenCalledTimes(1);
+    expect(wcSpy).toHaveBeenCalledWith(component);
+    expect(amSpy).toHaveBeenCalledTimes(1);
+    expect(amSpy).toHaveBeenCalledWith(component);
+  });
 });
