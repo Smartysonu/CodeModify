@@ -1,37 +1,31 @@
-describe('IconComponent ngOnInit condition', () => {
-  let storageSpy: jasmine.Spy;
-  let querySpy: jasmine.Spy;
-
-  beforeEach(() => {
-    // create spies once per spec, do not call fixture.detectChanges()
-    storageSpy = spyOn(component['storageService'], 'getSettingFromSessionStorage');
-    querySpy   = spyOn(component['el'].nativeElement, 'querySelector');
+describe('IconComponent ngOnInit (lines 78–79)', () => {
+  beforeAll(() => {
+    jasmine.getEnv().allowRespy(true); // allow re-spy across tests
   });
 
-  it('TRUE path: iframe open + non-empty expandcbIconText → chatIconText=true & remove class', () => {
+  it('TRUE path: iframe open + non-empty expandcbIconText → chatIconText=true and class removed', () => {
     const el = document.createElement('div');
     el.classList.add('rsc-clicked');
 
-    // handle typo in component code
     (component as any).expandcbIconText = 'someText';
-    (component as any).expanecbIconText = 'someText';
+    (component as any).expanecbIconText = 'someText'; // remove if no typo
+    component.chatIconText = false;
 
-    storageSpy.and.returnValue(true);   // isIframeOpen = true
-    querySpy.and.returnValue(el);       // element exists
+    spyOn(component['storageService'], 'getSettingFromSessionStorage').and.returnValue(true);
+    spyOn(component['el'].nativeElement, 'querySelector').and.returnValue(el);
 
     component.ngOnInit();
 
     expect(component.chatIconText).toBeTrue();
-    // positive: should remove class
-    expect(el.classList.contains('rsc-clicked')).toBeFalse();
+    expect(el.classList.contains('rsc-clicked')).toBeFalse(); // removed
   });
 
-  it('ELSE path: empty, undefined, iframeClosed, and no-element → chatIconText=false & class not removed', () => {
+  it('ELSE path: empty, undefined, iframeClosed, no-element → chatIconText=false & class NOT removed', () => {
     let isOpen = false;
     let domEl: HTMLElement | null = null;
 
-    storageSpy.and.callFake(() => isOpen);
-    querySpy.and.callFake(() => domEl);
+    spyOn(component['storageService'], 'getSettingFromSessionStorage').and.callFake(() => isOpen);
+    spyOn(component['el'].nativeElement, 'querySelector').and.callFake(() => domEl);
 
     const cases = [
       { name: 'empty string',     isOpen: true,  expand: '',          typo: '',          wantEl: true },
@@ -47,26 +41,16 @@ describe('IconComponent ngOnInit condition', () => {
       isOpen = c.isOpen;
       domEl  = c.wantEl ? el : null;
 
-      // reset state
-      component.chatIconText = true;
+      component.chatIconText = true; // prove it flips to false
       (component as any).expandcbIconText = c.expand as any;
       (component as any).expanecbIconText = c.typo as any;
 
       component.ngOnInit();
 
-      // ELSE branch always sets to false
       expect(component.chatIconText).toBeFalse();
-
       if (c.wantEl) {
-        // negative assertion: class should remain, not removed
-        expect(el.classList.contains('rsc-clicked')).toBeTrue();
-      } else {
-        // no element case: just make sure it didn't throw
-        expect(component.chatIconText).toBeFalse();
+        expect(el.classList.contains('rsc-clicked')).toBeTrue(); // not removed
       }
-
-      storageSpy.calls.reset();
-      querySpy.calls.reset();
     });
   });
 });
