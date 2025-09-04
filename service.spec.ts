@@ -1,26 +1,26 @@
-describe('IconComponent ngOnInit (lines 78–79)', () => {
-  beforeAll(() => {
-    jasmine.getEnv().allowRespy(true); // allow re-spy across tests
-  });
+import { fakeAsync, tick } from '@angular/core/testing';
 
-  it('TRUE path: iframe open + non-empty expandcbIconText → chatIconText=true and class removed', () => {
+describe('IconComponent ngOnInit (lines 78–79)', () => {
+  it('TRUE path: iframe open + non-empty expandcbIconText → chatIconText=true & class removed', fakeAsync(() => {
     const el = document.createElement('div');
     el.classList.add('rsc-clicked');
 
+    // If component checks both names, set both
     (component as any).expandcbIconText = 'someText';
-    (component as any).expanecbIconText = 'someText'; // remove if no typo
+    (component as any).expanecbIconText = 'someText';
     component.chatIconText = false;
 
     spyOn(component['storageService'], 'getSettingFromSessionStorage').and.returnValue(true);
     spyOn(component['el'].nativeElement, 'querySelector').and.returnValue(el);
 
     component.ngOnInit();
+    tick(); // flush setTimeout(...)
 
     expect(component.chatIconText).toBeTrue();
     expect(el.classList.contains('rsc-clicked')).toBeFalse(); // removed
-  });
+  }));
 
-  it('ELSE path: empty, undefined, iframeClosed, no-element → chatIconText=false & class NOT removed', () => {
+  it('ELSE path: empty, undefined, iframeClosed, no-element → chatIconText=false & class NOT removed', fakeAsync(() => {
     let isOpen = false;
     let domEl: HTMLElement | null = null;
 
@@ -34,23 +34,27 @@ describe('IconComponent ngOnInit (lines 78–79)', () => {
       { name: 'no element found', isOpen: true,  expand: 'someText',  typo: 'someText',  wantEl: false },
     ];
 
-    cases.forEach(c => {
+    for (const c of cases) {
       const el = document.createElement('div');
       el.classList.add('rsc-clicked');
 
       isOpen = c.isOpen;
       domEl  = c.wantEl ? el : null;
 
-      component.chatIconText = true; // prove it flips to false
+      // force opposite, prove flip to false
+      component.chatIconText = true;
       (component as any).expandcbIconText = c.expand as any;
       (component as any).expanecbIconText = c.typo as any;
 
       component.ngOnInit();
+      tick(); // flush setTimeout(...)
 
       expect(component.chatIconText).toBeFalse();
+
       if (c.wantEl) {
-        expect(el.classList.contains('rsc-clicked')).toBeTrue(); // not removed
+        // class should NOT be removed in else branch
+        expect(el.classList.contains('rsc-clicked')).toBeTrue();
       }
-    });
-  });
+    }
+  }));
 });
