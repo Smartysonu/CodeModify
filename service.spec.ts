@@ -1,53 +1,49 @@
 import { Subject } from 'rxjs';
 import { fakeAsync, tick } from '@angular/core/testing';
 
-it('covers ngOnInit icon toggle (both branches)', fakeAsync(() => {
-  // ── 1) minimal stubs for everything ngOnInit touches ─────────────────────────
-  // translationsService.language$ (stream)
+it('covers ngOnInit icon toggle (both branches) without spyOnProperty', fakeAsync(() => {
+  // ── Fake the two observables ngOnInit() subscribes to ────────────────────────
   const lang$ = new Subject<string>();
-  (component as any).translationsService.language$ = lang$;
-
-  // observableService.currentIncomingMessages$ (stream)
   const incoming$ = new Subject<any>();
-  (component as any).observableService.currentIncomingMessages$ = incoming$;
 
-  // uiService.isVisible getter + methods used
-  spyOnProperty(component['uiService'], 'isVisible', 'get').and.returnValue(true);
-  spyOn(component['uiService'], 'checkIsFrameOpen').and.stub();
-  spyOn(component['uiService'], 'onWindowOpen').and.stub();
+  (component as any).translationsService = { language$: lang$ } as any;
+  (component as any).observableService   = { currentIncomingMessages$: incoming$ } as any;
 
-  // anything else your ngOnInit calls that can be no-ops
-  spyOn(component as any, 'getTranslations').and.stub();
+  // ── Replace uiService with a tiny test double (no spyOnProperty needed) ──────
+  const uiDouble = {
+    _isVisible: true,
+    get isVisible() { return this._isVisible; },
+    checkIsFrameOpen: jasmine.createSpy('checkIsFrameOpen'),
+    onWindowOpen: jasmine.createSpy('onWindowOpen')
+  };
+  (component as any).uiService = uiDouble as any;
 
-  // ── 2) fake DOM element for #chatBotIcon ─────────────────────────────────────
+  // ── Provide the DOM node returned by querySelector ───────────────────────────
   const iconEle = document.createElement('div');
   iconEle.id = 'chatBotIcon';
-  iconEle.classList.add('rsc-clicked'); // start with the class so we can test removal
-  spyOn(component['el'].nativeElement, 'querySelector').and.returnValue(iconEle);
+  iconEle.classList.add('rsc-clicked'); // start with the class -> we can assert removal
+  spyOn((component as any).el.nativeElement, 'querySelector').and.returnValue(iconEle);
 
-  // Storage read used by the condition
-  const getSessionSpy = spyOn(
-    component['storageService'],
-    'getSettingFromSessionStorage'
-  );
+  // ── Spy the storage flag used by the condition (instance method) ─────────────
+  const sessionSpy = spyOn(component['storageService'], 'getSettingFromSessionStorage');
 
-  // ── 3) CASE 1: TRUE branch (iframe open + non-empty text) ────────────────────
-  getSessionSpy.and.returnValue(true);            // isIframeOpen = true
-  (component as any).expandcbIconText = 'text';   // non-empty
+  // ===================== CASE 1: TRUE branch ==================================
+  sessionSpy.and.returnValue(true);                  // isIframeOpen = true
+  (component as any).expandcbIconText = 'text';      // non-empty
 
   component.ngOnInit();
-  // fire the subscribes so inner setTimeout runs
-  lang$.next('en');         // any value
-  incoming$.next([]);       // any value
-  tick();                   // flush setTimeout in the subscribe
+  // drive the subscription and the inner setTimeout
+  lang$.next('en');
+  incoming$.next([]);
+  tick();                                            // flush timers queued in subscribe
 
   expect(component.chatIconText).toBeTrue();
-  expect(iconEle.classList.contains('rsc-clicked')).toBeFalse();
+  expect(iconEle.classList.contains('rsc-clicked')).toBeFalse(); // class removed
 
-  // ── 4) CASE 2: ELSE branch (iframe closed + empty text) ──────────────────────
-  iconEle.classList.remove('rsc-clicked'); // reset DOM state
-  getSessionSpy.and.returnValue(false);    // isIframeOpen = false
-  (component as any).expandcbIconText = '';
+  // ===================== CASE 2: ELSE branch ==================================
+  iconEle.classList.remove('rsc-clicked');           // reset DOM state
+  sessionSpy.and.returnValue(false);                 // isIframeOpen = false
+  (component as any).expandcbIconText = '';          // empty
 
   component.ngOnInit();
   lang$.next('en');
@@ -55,5 +51,5 @@ it('covers ngOnInit icon toggle (both branches)', fakeAsync(() => {
   tick();
 
   expect(component.chatIconText).toBeFalse();
-  expect(iconEle.classList.contains('rsc-clicked')).toBeTrue();
+  expect(iconEle.classList.contains('rsc-clicked')).toBeTrue();  // class added
 }));
