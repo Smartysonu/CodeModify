@@ -1,94 +1,44 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  <title>Accordion Without Button Tag</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
+it('TRUE path: iframe open + non-empty expandcbIconText → sets chatIconText=true and removes class', () => {
+  const el = document.createElement('div');
+  el.classList.add('rsc-clicked');
+
+  component.expandcbIconText = 'someText';
+  spyOn(component['storageService'], 'getSettingFromSessionStorage').and.returnValue(true);
+  spyOn(component['el'].nativeElement, 'querySelector').and.returnValue(el);
+
+  component.ngOnInit();
+
+  expect(component.chatIconText).toBeTrue();
+  expect(el.classList.contains('rsc-clicked')).toBeFalse();
+});
+
+it('ELSE path (table-driven): covers empty/undefined/iframeClosed and null element', () => {
+  const scenarios = [
+    { name: 'empty string',        isIframeOpen: true,  expand: '',          expectClicked: true },
+    { name: 'undefined',           isIframeOpen: true,  expand: undefined,   expectClicked: true },
+    { name: 'iframe closed',       isIframeOpen: false, expand: 'someText',  expectClicked: true },
+    { name: 'no element found',    isIframeOpen: true,  expand: 'someText',  expectClicked: null } // querySelector -> null
+  ];
+
+  scenarios.forEach(s => {
+    // fresh element per subcase (except null-element case)
+    const el = document.createElement('div');
+    el.classList.add('rsc-clicked');
+
+    spyOn(component['storageService'], 'getSettingFromSessionStorage').and.returnValue(s.isIframeOpen);
+    spyOn(component['el'].nativeElement, 'querySelector')
+      .and.returnValue(s.name === 'no element found' ? null : el);
+
+    (component as any).expandcbIconText = s.expand as any;
+
+    component.ngOnInit();
+
+    // common assertion for else branch
+    expect(component.chatIconText).toBeFalse();
+
+    // when element exists, class should remain; when null, just ensure no throw (no class assertion)
+    if (s.expectClicked !== null) {
+      expect(el.classList.contains('rsc-clicked')).toBeTrue();
     }
-
-    .messagebox {
-      border-left: 5px solid red;
-      background-color: #f5f5f5;
-      padding: 15px;
-      color: #000;
-      margin-bottom: 20px;
-    }
-
-    .messagebox strong {
-      color: red;
-      display: block;
-      margin-bottom: 8px;
-    }
-
-    .accordion-header {
-      background-color: #eee;
-      color: #444;
-      cursor: pointer;
-      padding: 10px;
-      width: 100%;
-      text-align: left;
-      font-size: 16px;
-      transition: background-color 0.3s;
-      margin-top: 10px;
-      border: 1px solid #ccc;
-    }
-
-    .accordion-header:hover,
-    .accordion-header.active {
-      background-color: #ccc;
-    }
-
-    .panel {
-      display: none;
-      padding: 15px;
-      background-color: white;
-      border: 1px solid #ccc;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      margin-bottom: 10px;
-    }
-  </style>
-</head>
-<body>
-
-  <!-- Red Message Box -->
-  <div class="messagebox">
-    <strong>Votre installation est en cours de préparation</strong>
-    Nous vous contacterons très bientôt avec plus d’informations ou pour vous demander des détails supplémentaires. Veuillez patienter.
-  </div>
-
-  <!-- Accordion Sections -->
-  <div class="accordion-header">Section 1</div>
-  <div class="panel">
-    <p>Contenu de la section 1 affiché correctement.</p>
-  </div>
-
-  <div class="accordion-header">Section 2</div>
-  <div class="panel">
-    <p>Contenu de la section 2 affiché correctement.</p>
-  </div>
-
-  <!-- Script -->
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const headers = document.querySelectorAll(".accordion-header");
-
-      headers.forEach(header => {
-        header.addEventListener("click", function () {
-          // Close all other panels
-          document.querySelectorAll(".panel").forEach(p => {
-            if (p !== this.nextElementSibling) p.style.display = "none";
-          });
-
-          // Toggle this panel
-          const panel = this.nextElementSibling;
-          panel.style.display = (panel.style.display === "block") ? "none" : "block";
-        });
-      });
-    });
-  </script>
-
-</body>
-</html>
+  });
+});
