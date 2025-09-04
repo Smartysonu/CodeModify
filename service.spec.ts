@@ -1,56 +1,59 @@
-describe('loadActionLib', () => {
-  // keep whatever your component reference is:
-  // let component: HeaderComponent;  // example
+import { Subject } from 'rxjs';
+import { fakeAsync, tick } from '@angular/core/testing';
 
-  let originalInception: any;
+it('covers ngOnInit icon toggle (both branches)', fakeAsync(() => {
+  // ── 1) minimal stubs for everything ngOnInit touches ─────────────────────────
+  // translationsService.language$ (stream)
+  const lang$ = new Subject<string>();
+  (component as any).translationsService.language$ = lang$;
 
-  beforeEach(() => {
-    // snapshot any existing global so we can restore it safely
-    originalInception = (component as any).window?.inception;
-  });
+  // observableService.currentIncomingMessages$ (stream)
+  const incoming$ = new Subject<any>();
+  (component as any).observableService.currentIncomingMessages$ = incoming$;
 
-  afterEach(() => {
-    // restore / remove any test mutation
-    if ((component as any).window) {
-      if (originalInception === undefined) {
-        delete (component as any).window.inception;
-      } else {
-        (component as any).window.inception = originalInception;
-      }
-    }
-  });
+  // uiService.isVisible getter + methods used
+  spyOnProperty(component['uiService'], 'isVisible', 'get').and.returnValue(true);
+  spyOn(component['uiService'], 'checkIsFrameOpen').and.stub();
+  spyOn(component['uiService'], 'onWindowOpen').and.stub();
 
-  it('should return early when window["inception"] is missing', () => {
-    // Arrange: make sure inception is NOT present
-    (component as any).window = (component as any).window || (window as any);
-    delete (component as any).window.inception;
+  // anything else your ngOnInit calls that can be no-ops
+  spyOn(component as any, 'getTranslations').and.stub();
 
-    // (No spies at all — if the function returns early, nothing to assert gets called)
-    // Act
-    (component as any).loadActionLib();
+  // ── 2) fake DOM element for #chatBotIcon ─────────────────────────────────────
+  const iconEle = document.createElement('div');
+  iconEle.id = 'chatBotIcon';
+  iconEle.classList.add('rsc-clicked'); // start with the class so we can test removal
+  spyOn(component['el'].nativeElement, 'querySelector').and.returnValue(iconEle);
 
-    // Assert: nothing threw; optional: assert that property is still undefined
-    expect((component as any).window.inception).toBeUndefined();
-  });
+  // Storage read used by the condition
+  const getSessionSpy = spyOn(
+    component['storageService'],
+    'getSettingFromSessionStorage'
+  );
 
-  it('should call inception.webComponentLoad and inception.actionMenu with component when present', () => {
-    // Arrange
-    const wcSpy = jasmine.createSpy('webComponentLoad');
-    const amSpy = jasmine.createSpy('actionMenu');
+  // ── 3) CASE 1: TRUE branch (iframe open + non-empty text) ────────────────────
+  getSessionSpy.and.returnValue(true);            // isIframeOpen = true
+  (component as any).expandcbIconText = 'text';   // non-empty
 
-    (component as any).window = (component as any).window || (window as any);
-    (component as any).window.inception = {
-      webComponentLoad: wcSpy,
-      actionMenu: amSpy,
-    };
+  component.ngOnInit();
+  // fire the subscribes so inner setTimeout runs
+  lang$.next('en');         // any value
+  incoming$.next([]);       // any value
+  tick();                   // flush setTimeout in the subscribe
 
-    // Act
-    (component as any).loadActionLib();
+  expect(component.chatIconText).toBeTrue();
+  expect(iconEle.classList.contains('rsc-clicked')).toBeFalse();
 
-    // Assert
-    expect(wcSpy).toHaveBeenCalledTimes(1);
-    expect(wcSpy).toHaveBeenCalledWith(component);
-    expect(amSpy).toHaveBeenCalledTimes(1);
-    expect(amSpy).toHaveBeenCalledWith(component);
-  });
-});
+  // ── 4) CASE 2: ELSE branch (iframe closed + empty text) ──────────────────────
+  iconEle.classList.remove('rsc-clicked'); // reset DOM state
+  getSessionSpy.and.returnValue(false);    // isIframeOpen = false
+  (component as any).expandcbIconText = '';
+
+  component.ngOnInit();
+  lang$.next('en');
+  incoming$.next([]);
+  tick();
+
+  expect(component.chatIconText).toBeFalse();
+  expect(iconEle.classList.contains('rsc-clicked')).toBeTrue();
+}));
