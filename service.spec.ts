@@ -1,64 +1,72 @@
-// put above tests:
-let storageSpy: jasmine.Spy;
-let querySpy: jasmine.Spy;
+describe('IconComponent ngOnInit condition', () => {
+  let storageSpy: jasmine.Spy;
+  let querySpy: jasmine.Spy;
 
-beforeEach(() => {
-  // create spies ONCE per test
-  storageSpy = spyOn(component['storageService'], 'getSettingFromSessionStorage');
-  querySpy   = spyOn(component['el'].nativeElement, 'querySelector');
-});
+  beforeEach(() => {
+    // create spies once per spec, do not call fixture.detectChanges()
+    storageSpy = spyOn(component['storageService'], 'getSettingFromSessionStorage');
+    querySpy   = spyOn(component['el'].nativeElement, 'querySelector');
+  });
 
-
-
-// TRUE branch
-it('sets chatIconText=true and removes class when iframe open & non-empty expandcbIconText', () => {
-  const el = document.createElement('div');
-  el.id = 'chatBotIcon';
-  el.classList.add('rsc-clicked');
-
-  // IMPORTANT: handle the code’s typo by setting both props
-  (component as any).expandcbIconText  = 'someText';
-  (component as any).expanecbIconText  = 'someText';
-
-  storageSpy.and.returnValue(true);     // isIframeOpen = true
-  querySpy.and.returnValue(el);         // element exists
-
-  component.ngOnInit();
-
-  expect(component.chatIconText).toBeTrue();
-  expect(el.classList.contains('rsc-clicked')).toBeFalse();
-});
-// ELSE branch (table-driven; reconfigure existing spies via callFake)
-it('sets chatIconText=false for empty/undefined/iframeClosed and handles null element', () => {
-  let isIframeOpenVar = false;
-  let elementVar: HTMLElement | null = null;
-
-  storageSpy.and.callFake(() => isIframeOpenVar);
-  querySpy.and.callFake(() => elementVar);
-
-  const cases = [
-    { name: 'empty string',     isOpen: true,  expand: '',          alsoTypo: '',         wantEl: true },
-    { name: 'undefined',        isOpen: true,  expand: undefined,   alsoTypo: undefined,  wantEl: true },
-    { name: 'iframe closed',    isOpen: false, expand: 'someText',  alsoTypo: 'someText', wantEl: true },
-    { name: 'no element found', isOpen: true,  expand: 'someText',  alsoTypo: 'someText', wantEl: false },
-  ];
-
-  cases.forEach(c => {
+  it('TRUE path: iframe open + non-empty expandcbIconText → chatIconText=true & remove class', () => {
     const el = document.createElement('div');
-    el.id = 'chatBotIcon';
     el.classList.add('rsc-clicked');
 
-    isIframeOpenVar = c.isOpen;
-    elementVar = c.wantEl ? el : null;
+    // handle typo in component code
+    (component as any).expandcbIconText = 'someText';
+    (component as any).expanecbIconText = 'someText';
 
-    (component as any).expandcbIconText = c.expand as any;
-    (component as any).expanecbIconText = c.alsoTypo as any; // match the typo in component code
+    storageSpy.and.returnValue(true);   // isIframeOpen = true
+    querySpy.and.returnValue(el);       // element exists
 
     component.ngOnInit();
 
-    expect(component.chatIconText).toBeFalse();
-    if (c.wantEl) {
-      expect(el.classList.contains('rsc-clicked')).toBeTrue();
-    }
+    expect(component.chatIconText).toBeTrue();
+    // positive: should remove class
+    expect(el.classList.contains('rsc-clicked')).toBeFalse();
+  });
+
+  it('ELSE path: empty, undefined, iframeClosed, and no-element → chatIconText=false & class not removed', () => {
+    let isOpen = false;
+    let domEl: HTMLElement | null = null;
+
+    storageSpy.and.callFake(() => isOpen);
+    querySpy.and.callFake(() => domEl);
+
+    const cases = [
+      { name: 'empty string',     isOpen: true,  expand: '',          typo: '',          wantEl: true },
+      { name: 'undefined',        isOpen: true,  expand: undefined,   typo: undefined,   wantEl: true },
+      { name: 'iframe closed',    isOpen: false, expand: 'someText',  typo: 'someText',  wantEl: true },
+      { name: 'no element found', isOpen: true,  expand: 'someText',  typo: 'someText',  wantEl: false },
+    ];
+
+    cases.forEach(c => {
+      const el = document.createElement('div');
+      el.classList.add('rsc-clicked');
+
+      isOpen = c.isOpen;
+      domEl  = c.wantEl ? el : null;
+
+      // reset state
+      component.chatIconText = true;
+      (component as any).expandcbIconText = c.expand as any;
+      (component as any).expanecbIconText = c.typo as any;
+
+      component.ngOnInit();
+
+      // ELSE branch always sets to false
+      expect(component.chatIconText).toBeFalse();
+
+      if (c.wantEl) {
+        // negative assertion: class should remain, not removed
+        expect(el.classList.contains('rsc-clicked')).toBeTrue();
+      } else {
+        // no element case: just make sure it didn't throw
+        expect(component.chatIconText).toBeFalse();
+      }
+
+      storageSpy.calls.reset();
+      querySpy.calls.reset();
+    });
   });
 });
