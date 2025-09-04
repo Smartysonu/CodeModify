@@ -1,43 +1,63 @@
-it('TRUE path: iframe open + non-empty expandcbIconText → sets chatIconText=true and removes class', () => {
+// put above tests:
+let storageSpy: jasmine.Spy;
+let querySpy: jasmine.Spy;
+
+beforeEach(() => {
+  // create spies ONCE per test
+  storageSpy = spyOn(component['storageService'], 'getSettingFromSessionStorage');
+  querySpy   = spyOn(component['el'].nativeElement, 'querySelector');
+});
+
+
+
+// TRUE branch
+it('sets chatIconText=true and removes class when iframe open & non-empty expandcbIconText', () => {
   const el = document.createElement('div');
+  el.id = 'chatBotIcon';
   el.classList.add('rsc-clicked');
 
-  component.expandcbIconText = 'someText';
-  spyOn(component['storageService'], 'getSettingFromSessionStorage').and.returnValue(true);
-  spyOn(component['el'].nativeElement, 'querySelector').and.returnValue(el);
+  // IMPORTANT: handle the code’s typo by setting both props
+  (component as any).expandcbIconText  = 'someText';
+  (component as any).expanecbIconText  = 'someText';
+
+  storageSpy.and.returnValue(true);     // isIframeOpen = true
+  querySpy.and.returnValue(el);         // element exists
 
   component.ngOnInit();
 
   expect(component.chatIconText).toBeTrue();
   expect(el.classList.contains('rsc-clicked')).toBeFalse();
 });
+// ELSE branch (table-driven; reconfigure existing spies via callFake)
+it('sets chatIconText=false for empty/undefined/iframeClosed and handles null element', () => {
+  let isIframeOpenVar = false;
+  let elementVar: HTMLElement | null = null;
 
-it('ELSE path (table-driven): covers empty/undefined/iframeClosed and null element', () => {
-  const scenarios = [
-    { name: 'empty string',        isIframeOpen: true,  expand: '',          expectClicked: true },
-    { name: 'undefined',           isIframeOpen: true,  expand: undefined,   expectClicked: true },
-    { name: 'iframe closed',       isIframeOpen: false, expand: 'someText',  expectClicked: true },
-    { name: 'no element found',    isIframeOpen: true,  expand: 'someText',  expectClicked: null } // querySelector -> null
+  storageSpy.and.callFake(() => isIframeOpenVar);
+  querySpy.and.callFake(() => elementVar);
+
+  const cases = [
+    { name: 'empty string',     isOpen: true,  expand: '',          alsoTypo: '',         wantEl: true },
+    { name: 'undefined',        isOpen: true,  expand: undefined,   alsoTypo: undefined,  wantEl: true },
+    { name: 'iframe closed',    isOpen: false, expand: 'someText',  alsoTypo: 'someText', wantEl: true },
+    { name: 'no element found', isOpen: true,  expand: 'someText',  alsoTypo: 'someText', wantEl: false },
   ];
 
-  scenarios.forEach(s => {
-    // fresh element per subcase (except null-element case)
+  cases.forEach(c => {
     const el = document.createElement('div');
+    el.id = 'chatBotIcon';
     el.classList.add('rsc-clicked');
 
-    spyOn(component['storageService'], 'getSettingFromSessionStorage').and.returnValue(s.isIframeOpen);
-    spyOn(component['el'].nativeElement, 'querySelector')
-      .and.returnValue(s.name === 'no element found' ? null : el);
+    isIframeOpenVar = c.isOpen;
+    elementVar = c.wantEl ? el : null;
 
-    (component as any).expandcbIconText = s.expand as any;
+    (component as any).expandcbIconText = c.expand as any;
+    (component as any).expanecbIconText = c.alsoTypo as any; // match the typo in component code
 
     component.ngOnInit();
 
-    // common assertion for else branch
     expect(component.chatIconText).toBeFalse();
-
-    // when element exists, class should remain; when null, just ensure no throw (no class assertion)
-    if (s.expectClicked !== null) {
+    if (c.wantEl) {
       expect(el.classList.contains('rsc-clicked')).toBeTrue();
     }
   });
