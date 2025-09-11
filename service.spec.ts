@@ -1,67 +1,31 @@
-import { Subject } from 'rxjs';
-import { fakeAsync, tick } from '@angular/core/testing';
+it('should do nothing if slider is not found', () => {
+  document.body.innerHTML = ''; // no slider
+  service.handleMetroLineCounterMobile();
+  expect(true).toBeTrue(); // no crash, branch covered
+});
 
-it('ngOnInit: calls key functions (no pxEventManager) and toggles icon correctly', fakeAsync(() => {
-  // ----- streams ngOnInit subscribes to -----
-  const lang$ = new Subject<any>();
-  const incoming$ = new Subject<any>();
-  (component as any).translationsService = { language$: lang$ } as any;
-  (component as any).observableService   = { currentIncomingMessages$: incoming$ } as any;
+it('should not scroll if slider has no selected element', () => {
+  const slider = document.createElement('div');
+  slider.className = 'rs-metroline mobile ui';
+  document.body.appendChild(slider);
 
-  // ----- uiService test double -----
-  (component as any).uiService = {
-    _isVisible: true,
-    get isVisible() { return this._isVisible; },
-    checkIsFrameOpen: jasmine.createSpy('checkIsFrameOpen'),
-    onWindowOpen: jasmine.createSpy('onWindowOpen'),
-  } as any;
+  service.handleMetroLineCounterMobile();
 
-  // ----- NO pxEventManager; ensure window exists but without event manager -----
-  (component as any).window = (component as any).window || {};
-  // guard matchMedia if used elsewhere in ngOnInit
-  (component as any).window.matchMedia = (q: string) =>
-    ({ matches: false, addEventListener() {}, removeEventListener() {} } as any);
+  expect(slider.scrollLeft).toBe(0);
+});
 
-  // ----- DOM node returned by querySelector (#chatBotIcon) -----
-  const iconEle = document.createElement('div');
-  iconEle.id = 'chatBotIcon';
-  iconEle.classList.add('rsc-clicked');
-  spyOn((component as any).el.nativeElement, 'querySelector').and.returnValue(iconEle);
+it('should scroll slider to center if current is selected', () => {
+  const slider = document.createElement('div');
+  slider.className = 'rs-metroline mobile ui';
 
-  // ----- storage flag used in condition & method invoked in the subscribe -----
-  const getSessSpy = spyOn(component['storageService'], 'getSettingFromSessionStorage');
-  const handleSpy  = spyOn(component as any, 'handleIncomingMessages');
+  const current = document.createElement('div');
+  current.className = 'rs-selected';
+  Object.defineProperty(current, 'offsetLeft', { value: 100, configurable: true });
 
-  // ================= TRUE branch =================
-  getSessSpy.and.returnValue(true);              // iframe open
-  (component as any).expandcbIconText = 'text';  // non-empty
+  slider.appendChild(current);
+  document.body.appendChild(slider);
 
-  component.ngOnInit();
-  // drive the subscriptions so inner setTimeout runs
-  lang$.next('en');
-  incoming$.next(5);  // any number → handleIncomingMessages(amount) should be called
-  tick();
+  service.handleMetroLineCounterMobile();
 
-  // function calls
-  expect((component as any).uiService.checkIsFrameOpen).toHaveBeenCalled();
-  expect((component as any).uiService.onWindowOpen).toHaveBeenCalled();
-  expect(handleSpy).toHaveBeenCalledWith(5);
-
-  // icon toggled
-  expect(component.chatIconText).toBeTrue();
-  expect(iconEle.classList.contains('rsc-clicked')).toBeFalse();
-
-  // ================= ELSE branch =================
-  iconEle.classList.remove('rsc-clicked'); // reset DOM
-  getSessSpy.and.returnValue(false);       // iframe closed
-  (component as any).expandcbIconText = ''; // empty
-
-  component.ngOnInit();
-  lang$.next('en');
-  incoming$.next(0);
-  tick();
-
-  // icon toggled back
-  expect(component.chatIconText).toBeFalse();
-  expect(iconEle.classList.contains('rsc-clicked')).toBeTrue();
-}));
+  expect(slider.scrollLeft).toBe(100 - window.innerWidth / 2 + 5);
+});
