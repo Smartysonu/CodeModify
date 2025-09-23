@@ -1,31 +1,48 @@
-it('should do nothing if slider is not found', () => {
-  document.body.innerHTML = ''; // no slider
-  service.handleMetroLineCounterMobile();
-  expect(true).toBeTrue(); // no crash, branch covered
+it('should call all required methods on onInput', () => {
+  spyOn(component, 'setNewQuery');
+  spyOn(component, 'getSuggestions');
+  spyOn(component, 'showSuggestions');
+  spyOn(component, 'showHistorySuggestions');
+  spyOn(component, 'fetchZonesData');
+
+  component.onInput();
+
+  expect(component.setNewQuery).toHaveBeenCalled();
+  expect(component.getSuggestions).toHaveBeenCalled();
+  expect(component.showSuggestions).toHaveBeenCalled();
+  expect(component.showHistorySuggestions).toHaveBeenCalled();
+  expect(component.fetchZonesData).toHaveBeenCalled();
 });
 
-it('should not scroll if slider has no selected element', () => {
-  const slider = document.createElement('div');
-  slider.className = 'rs-metroline mobile ui';
-  document.body.appendChild(slider);
+it('should call all required methods on onBlur after timeout', (done) => {
+  spyOn(component, 'clearSuggestions');
+  spyOn(component, 'hideSuggestions');
+  spyOn(component, 'hideHistorySuggestions');
+  spyOn(component, 'clearZonesData');
 
-  service.handleMetroLineCounterMobile();
+  component.onBlur();
 
-  expect(slider.scrollLeft).toBe(0);
+  setTimeout(() => {
+    expect(component.clearSuggestions).toHaveBeenCalled();
+    expect(component.hideSuggestions).toHaveBeenCalled();
+    expect(component.hideHistorySuggestions).toHaveBeenCalled();
+    expect(component.clearZonesData).toHaveBeenCalled();
+    done();
+  }, 300); // wait slightly more than 250
 });
 
-it('should scroll slider to center if current is selected', () => {
-  const slider = document.createElement('div');
-  slider.className = 'rs-metroline mobile ui';
+it('should call all required methods on onSubmit', () => {
+  spyOn(component, 'clearSuggestions');
+  spyOn(component, 'hideSuggestions');
+  spyOn(component, 'clearZonesData');
+  spyOn(component, 'searchAnalysis');
+  spyOn(component, 'submit');
 
-  const current = document.createElement('div');
-  current.className = 'rs-selected';
-  Object.defineProperty(current, 'offsetLeft', { value: 100, configurable: true });
+  component.onSubmit();
 
-  slider.appendChild(current);
-  document.body.appendChild(slider);
-
-  service.handleMetroLineCounterMobile();
-
-  expect(slider.scrollLeft).toBe(100 - window.innerWidth / 2 + 5);
+  expect(component.clearSuggestions).toHaveBeenCalled();
+  expect(component.hideSuggestions).toHaveBeenCalled();
+  expect(component.clearZonesData).toHaveBeenCalled();
+  expect(component.searchAnalysis).toHaveBeenCalled();
+  expect(component.submit).toHaveBeenCalled();
 });
