@@ -3,45 +3,73 @@ scrollToBottom() {
     const element = document.querySelectorAll('.rsc-da-bot_messages')[0];
     if (!element) return;
 
-    // 🔥 GET ALL span messages
     const allMsgs = element.querySelectorAll("span");
-
-    // 🔥 Find latest incoming message
     const lastMsg = allMsgs[allMsgs.length - 1];
 
-    // Default target
-    let targetTop = 0;
+    if (!lastMsg) return;
 
-    // 🔥 CASE 1 → USER MESSAGE → ALWAYS SCROLL TO BOTTOM
-    if (lastMsg && lastMsg.classList.contains('rsc-da-user__message')) {
-        targetTop = element.scrollHeight;  // scroll to last
+    // ============================================================
+    //                   USER MESSAGE RULE (RESET)
+    // ============================================================
+    if (lastMsg.classList.contains('rsc-da-user__message')) {
+
+        // Reset BOTH counters
+        this.botMsgCount = 0;
+        this.agentMsgCount = 0;
+
+        // Always scroll to bottom
+        this.scrollAnimationTarget = element.scrollHeight;
+
+        console.log("USER → scroll to bottom + RESET BOT & AGENT counters");
     }
 
-    // 🔥 CASE 2 → BOT OR AGENT MESSAGE
-    else if (
-        lastMsg &&
-        (lastMsg.classList.contains('rsc-da-bot__messages') ||
-         lastMsg.classList.contains('rsc-da-agent__message'))
-    ) {
+    // ============================================================
+    //                   BOT MESSAGE RULE
+    // ============================================================
+    else if (lastMsg.classList.contains('rsc-da-bot__messages')) {
 
-        // If 1st or 2nd message → scroll normally
-        if (allMsgs.length <= 2) {
-            targetTop = lastMsg.offsetTop;
-        } 
-        // After 2 messages → lock scroll on 2nd message
-        else {
-            const secondMsg = allMsgs[1];  // index = 1 → 2nd message
+        // Increase only BOT counter
+        this.botMsgCount++;
+        // Reset Agent count because it's a new bot sequence
+        this.agentMsgCount = 0;
+
+        if (this.botMsgCount <= 2) {
+            this.scrollAnimationTarget = lastMsg.offsetTop;
+            console.log(`BOT #${this.botMsgCount} → scroll normally`);
+        } else {
+            const secondMsg = allMsgs[1];
             if (secondMsg) {
-                targetTop = secondMsg.offsetTop;
+                this.scrollAnimationTarget = secondMsg.offsetTop;
+                console.log(`BOT #${this.botMsgCount} → LOCK at 2nd`);
             }
         }
     }
 
-    // 🔥 SET FINAL TARGET
-    this.scrollAnimationTarget = targetTop;
+    // ============================================================
+    //                AGENT MESSAGE RULE
+    // ============================================================
+    else if (lastMsg.classList.contains('rsc-da-agent__message')) {
 
-    // -------- Your Existing Animation Code Below -------- //
+        // Increase only AGENT counter
+        this.agentMsgCount++;
+        // Reset Bot count because it's a new agent sequence
+        this.botMsgCount = 0;
 
+        if (this.agentMsgCount <= 2) {
+            this.scrollAnimationTarget = lastMsg.offsetTop;
+            console.log(`AGENT #${this.agentMsgCount} → scroll normally`);
+        } else {
+            const secondMsg = allMsgs[1];
+            if (secondMsg) {
+                this.scrollAnimationTarget = secondMsg.offsetTop;
+                console.log(`AGENT #${this.agentMsgCount} → LOCK at 2nd`);
+            }
+        }
+    }
+
+    // ============================================================
+    //                 EXISTING ANIMATION LOGIC
+    // ============================================================
     const duration = 600;
     const startTime = Date.now();
     const endTime = startTime + duration;
