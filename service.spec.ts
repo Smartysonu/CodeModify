@@ -5,11 +5,10 @@ scrollToBottom() {
 
     const allMsgs = element.querySelectorAll("span");
     const lastMsg = allMsgs[allMsgs.length - 1];
-
     if (!lastMsg) return;
 
     // ============================================================
-    //                   USER MESSAGE RULE (RESET)
+    //                  USER MESSAGE RULE (RESET)
     // ============================================================
     if (lastMsg.classList.contains('rsc-da-user__message')) {
 
@@ -17,26 +16,31 @@ scrollToBottom() {
         this.botMsgCount = 0;
         this.agentMsgCount = 0;
 
-        // Always scroll to bottom
+        // Force scroll to bottom
+        this.forceBottomScroll = true;
+
+        // Bottom-most position
         this.scrollAnimationTarget = element.scrollHeight;
 
-        console.log("USER → scroll to bottom + RESET BOT & AGENT counters");
+        console.log("USER → force scroll to bottom + reset counters");
     }
 
     // ============================================================
-    //                   BOT MESSAGE RULE
+    //                  BOT MESSAGE RULE
     // ============================================================
     else if (lastMsg.classList.contains('rsc-da-bot__messages')) {
 
-        // Increase only BOT counter
+        // Increase ONLY bot counter
         this.botMsgCount++;
-        // Reset Agent count because it's a new bot sequence
+        // Reset agent counter
         this.agentMsgCount = 0;
 
         if (this.botMsgCount <= 2) {
+            // scroll normally
             this.scrollAnimationTarget = lastMsg.offsetTop;
             console.log(`BOT #${this.botMsgCount} → scroll normally`);
         } else {
+            // lock at second message
             const secondMsg = allMsgs[1];
             if (secondMsg) {
                 this.scrollAnimationTarget = secondMsg.offsetTop;
@@ -50,9 +54,9 @@ scrollToBottom() {
     // ============================================================
     else if (lastMsg.classList.contains('rsc-da-agent__message')) {
 
-        // Increase only AGENT counter
+        // Increase ONLY agent counter
         this.agentMsgCount++;
-        // Reset Bot count because it's a new agent sequence
+        // Reset bot counter
         this.botMsgCount = 0;
 
         if (this.agentMsgCount <= 2) {
@@ -68,7 +72,7 @@ scrollToBottom() {
     }
 
     // ============================================================
-    //                 EXISTING ANIMATION LOGIC
+    //              ANIMATION LOGIC (WITH FORCE FIX)
     // ============================================================
     const duration = 600;
     const startTime = Date.now();
@@ -91,12 +95,24 @@ scrollToBottom() {
 
         element.scrollTop = frameTop;
 
-        if (now >= endTime) return true;
+        // USER MODE: do NOT allow early stopping
+        if (!this.forceBottomScroll) {
 
-        if (element.scrollTop === previousTop && element.scrollTop !== frameTop)
-            return true;
+            if (now >= endTime) return true;
+
+            // If scroll stopped early → stop animation
+            if (element.scrollTop === previousTop && element.scrollTop !== frameTop)
+                return true;
+        }
 
         previousTop = element.scrollTop;
+
+        // Finish animation → reset user mode
+        if (this.forceBottomScroll && now >= endTime) {
+            this.forceBottomScroll = false;
+            return true;
+        }
+
         setTimeout(scrollFrame, 1);
     };
 
