@@ -1,81 +1,76 @@
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { TimeSlotPickerComponent } from './time-slot-picker.component';
-import { DSDatePickerComponent } from '@dch/pxs-angular-design-system';
-import { McseService, SessionStorageService } from '@app_services';
-import { ChangeDetectorRef } from '@angular/core';
+scrollToBottom() {
 
-describe('TimeSlotPickerComponent', () => {
-  let component: TimeSlotPickerComponent;
-  let fixture: ComponentFixture<TimeSlotPickerComponent>;
-  let mockDatePicker: jasmine.SpyObj<DSDatePickerComponent>;
-  let mockSession: jasmine.SpyObj<SessionStorageService>;
-  let mockCdr: jasmine.SpyObj<ChangeDetectorRef>;
+    const element = document.querySelectorAll('.rsc-da-bot_messages')[0];
+    if (!element) return;
 
-  beforeEach(() => {
-    mockDatePicker = jasmine.createSpyObj('DSDatePickerComponent', ['selectDate'], {
-      isSelectable: jasmine.createSpy('isSelectable')
-    });
+    // 🔥 GET ALL span messages
+    const allMsgs = element.querySelectorAll("span");
 
-    mockSession = jasmine.createSpyObj('SessionStorageService', ['getItem']);
-    mockCdr = jasmine.createSpyObj('ChangeDetectorRef', ['detectChanges']);
+    // 🔥 Find latest incoming message
+    const lastMsg = allMsgs[allMsgs.length - 1];
 
-    TestBed.configureTestingModule({
-      declarations: [TimeSlotPickerComponent],
-      providers: [
-        { provide: McseService, useValue: {} },
-        { provide: SessionStorageService, useValue: mockSession },
-        { provide: ChangeDetectorRef, useValue: mockCdr }
-      ]
-    });
+    // Default target
+    let targetTop = 0;
 
-    fixture = TestBed.createComponent(TimeSlotPickerComponent);
-    component = fixture.componentInstance;
-  });
+    // 🔥 CASE 1 → USER MESSAGE → ALWAYS SCROLL TO BOTTOM
+    if (lastMsg && lastMsg.classList.contains('rsc-da-user__message')) {
+        targetTop = element.scrollHeight;  // scroll to last
+    }
 
-  // ✅ Positive case — when datePicker is defined
-  it('should initialize uniqueDates, override isSelectable, and select first available date', fakeAsync(() => {
-    component.datePicker = mockDatePicker;
-    mockSession.getItem.and.returnValue([
-      { startTime: '2025-10-18T08:00:00Z' },
-      { startTime: '2025-10-19T10:00:00Z' },
-      { startTime: '2025-10-18T09:00:00Z' }
-    ]);
+    // 🔥 CASE 2 → BOT OR AGENT MESSAGE
+    else if (
+        lastMsg &&
+        (lastMsg.classList.contains('rsc-da-bot__messages') ||
+         lastMsg.classList.contains('rsc-da-agent__message'))
+    ) {
 
-    spyOn(component, 'onSelectDate');
+        // If 1st or 2nd message → scroll normally
+        if (allMsgs.length <= 2) {
+            targetTop = lastMsg.offsetTop;
+        } 
+        // After 2 messages → lock scroll on 2nd message
+        else {
+            const secondMsg = allMsgs[1];  // index = 1 → 2nd message
+            if (secondMsg) {
+                targetTop = secondMsg.offsetTop;
+            }
+        }
+    }
 
-    // Run lifecycle method
-    component.ngAfterViewInit();
-    tick(); // flush setTimeout
+    // 🔥 SET FINAL TARGET
+    this.scrollAnimationTarget = targetTop;
 
-    // ✅ uniqueDates are extracted correctly
-    expect(component.uniqueDates).toEqual(['2025-10-18', '2025-10-19']);
+    // -------- Your Existing Animation Code Below -------- //
 
-    // ✅ isSelectable overridden and works for enabled date
-    const testDate = new Date('2025-10-18T00:00:00Z');
-    const result = (component.datePicker.isSelectable as any)(testDate, null);
-    expect(result).toBeTrue();
+    const duration = 600;
+    const startTime = Date.now();
+    const endTime = startTime + duration;
+    const startTop = element.scrollTop;
 
-    // ✅ isSelectable returns false for non-matching date
-    const badDate = new Date('2025-11-01T00:00:00Z');
-    const result2 = (component.datePicker.isSelectable as any)(badDate, null);
-    expect(result2).toBeFalse();
+    const smoothStep = (start, end, point) => {
+        if (point <= start) return 0;
+        if (point >= end) return 1;
+        const x = (point - start) / (end - start);
+        return x * x * (3 - 2 * x);
+    };
 
-    // ✅ selectDate, onSelectDate, and detectChanges called
-    expect(mockDatePicker.selectDate).toHaveBeenCalledWith(new Date('2025-10-18'));
-    expect(component.onSelectDate).toHaveBeenCalledWith([new Date('2025-10-18')]);
-    expect(mockCdr.detectChanges).toHaveBeenCalled();
-  }));
+    let previousTop = element.scrollTop;
 
-  // ✅ Negative case — when datePicker is not defined
-  it('should gracefully skip logic if datePicker is undefined', () => {
-    component.datePicker = undefined as any;
-    mockSession.getItem.and.returnValue([]);
+    const scrollFrame = () => {
+        const now = Date.now();
+        const point = smoothStep(startTime, endTime, now);
+        const frameTop = Math.round(startTop + (this.scrollAnimationTarget - startTop) * point);
 
-    // Should not throw any error
-    expect(() => component.ngAfterViewInit()).not.toThrow();
+        element.scrollTop = frameTop;
 
-    // Nothing should be modified
-    expect(component.uniqueDates).toEqual([]);
-    expect(mockCdr.detectChanges).not.toHaveBeenCalled();
-  });
-});
+        if (now >= endTime) return true;
+
+        if (element.scrollTop === previousTop && element.scrollTop !== frameTop)
+            return true;
+
+        previousTop = element.scrollTop;
+        setTimeout(scrollFrame, 1);
+    };
+
+    setTimeout(scrollFrame, 50);
+}
