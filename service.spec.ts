@@ -1,87 +1,140 @@
 scrollToBottom() {
+    console.log("===============================================");
+    console.log("🟡 scrollToBottom() TRIGGERED");
+
     const element = document.querySelector('.rsc-da-bot_messages');
+    console.log("element =", element);
+
     if (!element) {
-        console.log("❌ No scroll container found");
+        console.log("❌ element NOT FOUND (.rsc-da-bot_messages)");
         return;
     }
 
-    const allMsgs = element.querySelectorAll("span");
-    const lastMsg = allMsgs[allMsgs.length - 1];
+    // ---------------------------------------------------
+    // GET ALL MESSAGES (SPANS)
+    // ---------------------------------------------------
+    const spans = element.querySelectorAll("span");
+    const last = spans[spans.length - 1];
 
-    console.log("====================================");
-    console.log("🟡 scrollToBottom() triggered");
-    console.log("Total messages:", allMsgs.length);
-    console.log("Last message:", lastMsg?.innerText);
+    console.log("Total spans found:", spans.length);
+    console.log("Last span class:", last?.className);
+    console.log("Last span text:", last?.innerText);
 
-    // Identify type
-    let type = "unknown";
-    if (lastMsg?.classList.contains("rsc-da-user__message")) type = "USER";
-    if (lastMsg?.classList.contains("rsc-da-bot__messages")) type = "BOT";
-    if (lastMsg?.classList.contains("rsc-da-agent__message")) type = "AGENT";
+    // ---------------------------------------------------
+    // DETECT TYPE
+    // ---------------------------------------------------
+    let type = "";
+    if (last?.classList.contains("rsc-da-user__message")) type = "USER";
+    if (last?.classList.contains("rsc-bot-message_group-bot")) type = "BOT";
+    if (last?.classList.contains("rsc-da-agent__message")) type = "AGENT";
 
-    console.log("Last message TYPE:", type);
+    console.log("🟢 Message TYPE detected =", type);
 
-    console.log("Current botMsgCount:", this.botMsgCount);
-    console.log("Current agentMsgCount:", this.agentMsgCount);
+    // ---------------------------------------------------
+    // INIT COUNTERS
+    // ---------------------------------------------------
+    if (this.botCount === undefined) this.botCount = 0;
+    if (this.agentCount === undefined) this.agentCount = 0;
 
-    let target;
+    // ---------------------------------------------------
+    // DECIDE TARGET
+    // ---------------------------------------------------
+    let target = element.scrollHeight; // default bottom
 
-    // ------------------ USER MESSAGE ------------------
     if (type === "USER") {
-        this.botMsgCount = 0;
-        this.agentMsgCount = 0;
+        console.log("👤 USER → Reset bot & agent counters + scroll bottom");
+
+        this.botCount = 0;
+        this.agentCount = 0;
+
         target = element.scrollHeight;
-
-        console.log("➡ USER → RESET counters");
-        console.log("➡ USER → Target = BOTTOM:", target);
     }
 
-    // ------------------ BOT MESSAGE ------------------
-    else if (type === "BOT") {
-        this.botMsgCount++;
-        this.agentMsgCount = 0;
+    if (type === "BOT") {
+        this.botCount++;
+        this.agentCount = 0; // reset agent
 
-        console.log("➡ BOT message #", this.botMsgCount);
+        console.log("🤖 BOT Message #", this.botCount);
 
-        if (this.botMsgCount <= 2) {
-            target = lastMsg.offsetTop;
-            console.log("➡ BOT → Scroll to bot msg:", target);
+        if (this.botCount <= 2) {
+            target = last.offsetTop;
+            console.log("➡ BOT → Normal scroll to offsetTop:", target);
         } else {
-            const secondMsg = allMsgs[1];
-            target = secondMsg?.offsetTop ?? 0;
-            console.log("➡ BOT → LOCK at 2nd msg:", target);
+            const second = spans[1];
+            target = second ? second.offsetTop : 0;
+            console.log("➡ BOT → LOCK at 2nd message. Target:", target);
         }
     }
 
-    // ------------------ AGENT MESSAGE ------------------
-    else if (type === "AGENT") {
-        this.agentMsgCount++;
-        this.botMsgCount = 0;
+    if (type === "AGENT") {
+        this.agentCount++;
+        this.botCount = 0; // reset bot
 
-        console.log("➡ AGENT message #", this.agentMsgCount);
+        console.log("👨‍💼 AGENT Message #", this.agentCount);
 
-        if (this.agentMsgCount <= 2) {
-            target = lastMsg.offsetTop;
-            console.log("➡ AGENT → Scroll to agent msg:", target);
+        if (this.agentCount <= 2) {
+            target = last.offsetTop;
+            console.log("➡ AGENT → Normal scroll:", target);
         } else {
-            const secondMsg = allMsgs[1];
-            target = secondMsg?.offsetTop ?? 0;
-            console.log("➡ AGENT → LOCK at 2nd msg:", target);
+            const second = spans[1];
+            target = second ? second.offsetTop : 0;
+            console.log("➡ AGENT → LOCK at 2nd message. Target:", target);
         }
     }
 
-    // ------------------ APPLY SCROLL ------------------
-    if (target !== undefined) {
-        console.log("📌 Setting scrollTop =", target);
-        element.scrollTop = target;
+    // ---------------------------------------------------
+    // APPLY TARGET BEFORE ANIMATION
+    // ---------------------------------------------------
+    console.log("📌 FINAL scrollAnimationTarget set to:", target);
+    this.scrollAnimationTarget = target;
 
-        // Log actual DOM result
-        setTimeout(() => {
-            console.log("📌 Actual scrollTop =", element.scrollTop);
-            console.log("====================================");
-        }, 20);
-    } else {
-        console.log("❌ No target calculated");
-        console.log("====================================");
-    }
+    // ---------------------------------------------------
+    // ORIGINAL ANIMATION (UNCHANGED)
+    // ---------------------------------------------------
+    const duration = 600;
+    const startTime = Date.now();
+    const endTime = startTime + duration;
+    const startTop = element.scrollTop;
+
+    console.log("StartTop:", startTop, "Duration:", duration);
+
+    const smoothStep = (start, end, point) => {
+        if (point <= start) return 0;
+        if (point >= end) return 1;
+        const x = (point - start) / (end - start);
+        return x * x * (3 - 2 * x);
+    };
+
+    let previousTop = element.scrollTop;
+
+    const scrollFrame = () => {
+        const now = Date.now();
+        const point = smoothStep(startTime, endTime, now);
+        const frameTop = Math.round(startTop + (this.scrollAnimationTarget - startTop) * point);
+
+        console.log("--------------------------------------");
+        console.log("🌀 scrollFrame → now:", now);
+        console.log("PreviousTop:", previousTop);
+        console.log("Calculated frameTop:", frameTop);
+
+        // If stuck
+        if (element.scrollTop === previousTop && element.scrollTop !== frameTop) {
+            console.log("⚠ scroll stuck → stopping");
+            return true;
+        }
+
+        element.scrollTop = frameTop;
+        console.log("scrollTop set to:", element.scrollTop);
+
+        if (now >= endTime) {
+            console.log("⏹ Animation completed");
+            return true;
+        }
+
+        previousTop = element.scrollTop;
+        setTimeout(scrollFrame, 1);
+    };
+
+    console.log("⏳ Scheduling animation...");
+    setTimeout(scrollFrame, 50);
 }
