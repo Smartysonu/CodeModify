@@ -1,120 +1,87 @@
 scrollToBottom() {
-
-    const element = document.querySelectorAll('.rsc-da-bot_messages')[0];
-    if (!element) return;
+    const element = document.querySelector('.rsc-da-bot_messages');
+    if (!element) {
+        console.log("❌ No scroll container found");
+        return;
+    }
 
     const allMsgs = element.querySelectorAll("span");
     const lastMsg = allMsgs[allMsgs.length - 1];
-    if (!lastMsg) return;
 
-    // ============================================================
-    //                  USER MESSAGE RULE (RESET)
-    // ============================================================
-    if (lastMsg.classList.contains('rsc-da-user__message')) {
+    console.log("====================================");
+    console.log("🟡 scrollToBottom() triggered");
+    console.log("Total messages:", allMsgs.length);
+    console.log("Last message:", lastMsg?.innerText);
 
-        // Reset BOTH counters
+    // Identify type
+    let type = "unknown";
+    if (lastMsg?.classList.contains("rsc-da-user__message")) type = "USER";
+    if (lastMsg?.classList.contains("rsc-da-bot__messages")) type = "BOT";
+    if (lastMsg?.classList.contains("rsc-da-agent__message")) type = "AGENT";
+
+    console.log("Last message TYPE:", type);
+
+    console.log("Current botMsgCount:", this.botMsgCount);
+    console.log("Current agentMsgCount:", this.agentMsgCount);
+
+    let target;
+
+    // ------------------ USER MESSAGE ------------------
+    if (type === "USER") {
         this.botMsgCount = 0;
         this.agentMsgCount = 0;
+        target = element.scrollHeight;
 
-        // Force scroll to bottom
-        this.forceBottomScroll = true;
-
-        // Bottom-most position
-        this.scrollAnimationTarget = element.scrollHeight;
-
-        console.log("USER → force scroll to bottom + reset counters");
+        console.log("➡ USER → RESET counters");
+        console.log("➡ USER → Target = BOTTOM:", target);
     }
 
-    // ============================================================
-    //                  BOT MESSAGE RULE
-    // ============================================================
-    else if (lastMsg.classList.contains('rsc-da-bot__messages')) {
-
-        // Increase ONLY bot counter
+    // ------------------ BOT MESSAGE ------------------
+    else if (type === "BOT") {
         this.botMsgCount++;
-        // Reset agent counter
         this.agentMsgCount = 0;
+
+        console.log("➡ BOT message #", this.botMsgCount);
 
         if (this.botMsgCount <= 2) {
-            // scroll normally
-            this.scrollAnimationTarget = lastMsg.offsetTop;
-            console.log(`BOT #${this.botMsgCount} → scroll normally`);
+            target = lastMsg.offsetTop;
+            console.log("➡ BOT → Scroll to bot msg:", target);
         } else {
-            // lock at second message
             const secondMsg = allMsgs[1];
-            if (secondMsg) {
-                this.scrollAnimationTarget = secondMsg.offsetTop;
-                console.log(`BOT #${this.botMsgCount} → LOCK at 2nd`);
-            }
+            target = secondMsg?.offsetTop ?? 0;
+            console.log("➡ BOT → LOCK at 2nd msg:", target);
         }
     }
 
-    // ============================================================
-    //                AGENT MESSAGE RULE
-    // ============================================================
-    else if (lastMsg.classList.contains('rsc-da-agent__message')) {
-
-        // Increase ONLY agent counter
+    // ------------------ AGENT MESSAGE ------------------
+    else if (type === "AGENT") {
         this.agentMsgCount++;
-        // Reset bot counter
         this.botMsgCount = 0;
 
+        console.log("➡ AGENT message #", this.agentMsgCount);
+
         if (this.agentMsgCount <= 2) {
-            this.scrollAnimationTarget = lastMsg.offsetTop;
-            console.log(`AGENT #${this.agentMsgCount} → scroll normally`);
+            target = lastMsg.offsetTop;
+            console.log("➡ AGENT → Scroll to agent msg:", target);
         } else {
             const secondMsg = allMsgs[1];
-            if (secondMsg) {
-                this.scrollAnimationTarget = secondMsg.offsetTop;
-                console.log(`AGENT #${this.agentMsgCount} → LOCK at 2nd`);
-            }
+            target = secondMsg?.offsetTop ?? 0;
+            console.log("➡ AGENT → LOCK at 2nd msg:", target);
         }
     }
 
-    // ============================================================
-    //              ANIMATION LOGIC (WITH FORCE FIX)
-    // ============================================================
-    const duration = 600;
-    const startTime = Date.now();
-    const endTime = startTime + duration;
-    const startTop = element.scrollTop;
+    // ------------------ APPLY SCROLL ------------------
+    if (target !== undefined) {
+        console.log("📌 Setting scrollTop =", target);
+        element.scrollTop = target;
 
-    const smoothStep = (start, end, point) => {
-        if (point <= start) return 0;
-        if (point >= end) return 1;
-        const x = (point - start) / (end - start);
-        return x * x * (3 - 2 * x);
-    };
-
-    let previousTop = element.scrollTop;
-
-    const scrollFrame = () => {
-        const now = Date.now();
-        const point = smoothStep(startTime, endTime, now);
-        const frameTop = Math.round(startTop + (this.scrollAnimationTarget - startTop) * point);
-
-        element.scrollTop = frameTop;
-
-        // USER MODE: do NOT allow early stopping
-        if (!this.forceBottomScroll) {
-
-            if (now >= endTime) return true;
-
-            // If scroll stopped early → stop animation
-            if (element.scrollTop === previousTop && element.scrollTop !== frameTop)
-                return true;
-        }
-
-        previousTop = element.scrollTop;
-
-        // Finish animation → reset user mode
-        if (this.forceBottomScroll && now >= endTime) {
-            this.forceBottomScroll = false;
-            return true;
-        }
-
-        setTimeout(scrollFrame, 1);
-    };
-
-    setTimeout(scrollFrame, 50);
+        // Log actual DOM result
+        setTimeout(() => {
+            console.log("📌 Actual scrollTop =", element.scrollTop);
+            console.log("====================================");
+        }, 20);
+    } else {
+        console.log("❌ No target calculated");
+        console.log("====================================");
+    }
 }
