@@ -1,58 +1,27 @@
-private handleStreamingChunk(data: {
-  chatId: string;
-  text: string;
-  isStreaming: boolean;
-}): void {
+private handleStreamingChunk(dataChunk: MessageChunkEvent) {
+  const { chatId, messageId, chunk, done } = dataChunk;
 
-  let groupIndex = -1;
-  let messageIndex = -1;
+  // TODO: change this lookup if your group doesn't store chatId
+  const groupIndex = this.messageGroups.findIndex(g => g.chatId === chatId);
+  if (groupIndex === -1) return;
 
-  // 🔍 find existing streaming bot message
-  this.messageGroups.some((group, gIdx) => {
-    const idx = group.messages.findIndex(
-      (m: Message) => m.chatId === data.chatId && m.isStreaming
-    );
+  const group = this.messageGroups[groupIndex];
 
-    if (idx !== -1) {
-      groupIndex = gIdx;
-      messageIndex = idx;
-      return true;
-    }
-    return false;
-  });
+  let msg = group.messages.find(m => m.messageId === messageId);
 
-  // 🟢 first chunk → create new bot message
-  if (messageIndex === -1) {
-    const streamingMessage: Message = {
-      chatId: data.chatId,
-      sender: 'bot',
-      text: data.text || '',
-      isStreaming: true
-    };
+  if (!msg) {
+    msg = {
+      chatId,
+      messageId,
+      text: '',          // if your field is messageText, change here
+      isStreaming: true,
+    } as any;
 
-    // 🔴 use EXISTING grouping logic
-    if (!this.messageGroups.length) {
-      this.messageGroups.push({
-        date: new Date(),
-        messages: [streamingMessage]
-      });
-    } else {
-      this.messageGroups[this.messageGroups.length - 1]
-        .messages.push(streamingMessage);
-    }
-
-    return;
+    group.messages.push(msg);
   }
 
-  // 🟡 append chunk
-  this.messageGroups[groupIndex]
-    .messages[messageIndex]
-    .text += data.text || '';
+  msg.text = (msg.text || '') + (chunk || '');
+  msg.isStreaming = !done;
 
-  // 🔴 stream finished
-  if (!data.isStreaming) {
-    this.messageGroups[groupIndex]
-      .messages[messageIndex]
-      .isStreaming = false;
-  }
+  this.scrollToBottom?.();
 }
