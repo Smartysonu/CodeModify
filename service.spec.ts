@@ -1,25 +1,19 @@
-@SubscribeMessage('sendMessageStream')
-async handleStreamMessage(
-  @MessageBody() payload: { message: string; chatId: number },
-  @ConnectedSocket() client: Socket,
-) {
-  const text = payload.message;
+this.socketService.getStreamMessages().subscribe(event => {
 
-  // MOCK streaming for POC
-  const chunks = text.match(/.{1,4}/g); // 4-char chunks
-
-  for (const chunk of chunks) {
-    client.emit('messageChunk', {
-      chatId: payload.chatId,
-      chunk,
-      done: false,
-    });
-
-    await new Promise(res => setTimeout(res, 60));
+  if (!this.currentStreamingMessage) {
+    this.currentStreamingMessage = {
+      text: '',
+      isStreaming: true
+    };
+    this.messages.push(this.currentStreamingMessage);
   }
 
-  client.emit('messageChunk', {
-    chatId: payload.chatId,
-    done: true,
-  });
-}
+  if (event.chunk) {
+    this.currentStreamingMessage.text += event.chunk;
+  }
+
+  if (event.done) {
+    this.currentStreamingMessage.isStreaming = false;
+    this.currentStreamingMessage = null;
+  }
+});
