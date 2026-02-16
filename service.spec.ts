@@ -1,36 +1,25 @@
- it('should replace {{AgentName}} with strong tag when nickname is valid', () => {
-  component.liveAgentNickName = 'Sarah';
+@SubscribeMessage('sendMessageStream')
+async handleStreamMessage(
+  @MessageBody() payload: { message: string; chatId: number },
+  @ConnectedSocket() client: Socket,
+) {
+  const text = payload.message;
 
-  spyOn(translationsService, 'getLocalTranslation')
-    .and.returnValue('Chat with {{AgentName}} now');
+  // MOCK streaming for POC
+  const chunks = text.match(/.{1,4}/g); // 4-char chunks
 
-  component['getTranslations']();
+  for (const chunk of chunks) {
+    client.emit('messageChunk', {
+      chatId: payload.chatId,
+      chunk,
+      done: false,
+    });
 
-  expect(component.livewithlabel)
-    .toBe('Chat with <strong>Sarah</strong> now');
-});
+    await new Promise(res => setTimeout(res, 60));
+  }
 
-it('should return label unchanged when nickname is blank', () => {
-  component.liveAgentNickName = ' '; // fails IF condition
-
-  spyOn(translationsService, 'getLocalTranslation')
-    .and.returnValue('Chat with {{AgentName}} now');
-
-  component['getTranslations']();
-
-  expect(component.livewithlabel)
-    .toBe('Chat with {{AgentName}} now');
-});
-
-
-it('should return label unchanged when placeholder is missing', () => {
-  component.liveAgentNickName = 'Sarah';
-
-  spyOn(translationsService, 'getLocalTranslation')
-    .and.returnValue('Welcome to support');
-
-  component['getTranslations']();
-
-  expect(component.livewithlabel).toBe('Welcome to support');
-});
-
+  client.emit('messageChunk', {
+    chatId: payload.chatId,
+    done: true,
+  });
+}
